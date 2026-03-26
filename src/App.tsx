@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { appendSessionLog, defaultSettings, loadSettings, saveSettings } from './storage';
+import { appendSessionLog, loadSettings, saveSettings } from './storage';
 import { distanceFromCenter, pointFromOrientation } from './sensor';
 import type { DurationOption, Leg, Screen, SensorPoint, SessionLog, Settings } from './types';
 
 const DURATION_OPTIONS: DurationOption[] = [20, 30, 60];
 const TARGET_RADIUS = 0.4;
 
-type OrientationPermission = {
+type DeviceOrientationEventWithPermission = {
   requestPermission?: () => Promise<'granted' | 'denied'>;
 };
 
@@ -14,7 +14,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>('start');
   const [settings, setSettings] = useState<Settings>(loadSettings());
   const [countdown, setCountdown] = useState(3);
-  const [remainingSec, setRemainingSec] = useState(settings.durationSec);
+  const [remainingSec, setRemainingSec] = useState<number>(settings.durationSec);
   const [position, setPosition] = useState<SensorPoint>({ x: 0, y: 0 });
   const [rawOrientation, setRawOrientation] = useState<SensorPoint>({ x: 0, y: 0 });
   const [calibration, setCalibration] = useState<SensorPoint | null>(null);
@@ -95,7 +95,7 @@ function App() {
   }, [screen]);
 
   async function requestMotionPermissionIfNeeded() {
-    const anyOrientation = DeviceOrientationEvent as DeviceOrientationEvent & OrientationPermission;
+    const anyOrientation = DeviceOrientationEvent as unknown as DeviceOrientationEventWithPermission;
     if (typeof anyOrientation.requestPermission === 'function') {
       const result = await anyOrientation.requestPermission();
       if (result !== 'granted') {
