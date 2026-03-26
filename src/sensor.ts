@@ -3,10 +3,11 @@ import type { SensorPoint } from './types';
 export const SENSOR_SENSITIVITY_DEG = 24;
 export const SMOOTHING_ALPHA = 0.25;
 export const RAW_JUMP_REJECT_DEG = 22;
+export const MAX_TILT_DEG = 65;
 
 export const AXIS_MAPPING = {
-  x: 'beta',
-  y: 'gamma',
+  x: 'gamma',
+  y: 'beta',
 } as const;
 
 export const AXIS_SIGNS = {
@@ -17,8 +18,8 @@ export const AXIS_SIGNS = {
 export const MAX_RADIUS = 0.96;
 
 export function mapOrientation(event: DeviceOrientationEvent): SensorPoint {
-  const beta = event.beta ?? 0;
-  const gamma = event.gamma ?? 0;
+  const beta = clamp(event.beta ?? 0, -MAX_TILT_DEG, MAX_TILT_DEG);
+  const gamma = clamp(event.gamma ?? 0, -MAX_TILT_DEG, MAX_TILT_DEG);
 
   const axisValue = { beta, gamma };
 
@@ -41,6 +42,10 @@ export function pointFromOrientation(
 }
 
 export function shouldRejectRawJump(currentRaw: SensorPoint, previousRaw: SensorPoint, maxDeltaDeg: number) {
+  if (!isFinitePoint(currentRaw) || !isFinitePoint(previousRaw)) {
+    return true;
+  }
+
   return (
     Math.abs(currentRaw.x - previousRaw.x) > maxDeltaDeg ||
     Math.abs(currentRaw.y - previousRaw.y) > maxDeltaDeg
@@ -49,10 +54,10 @@ export function shouldRejectRawJump(currentRaw: SensorPoint, previousRaw: Sensor
 
 export function smoothPoint(next: SensorPoint, prev: SensorPoint, alpha: number): SensorPoint {
   const w = clamp(alpha, 0, 1);
-  return {
+  return limitToCircle({
     x: prev.x + (next.x - prev.x) * w,
     y: prev.y + (next.y - prev.y) * w,
-  };
+  }, MAX_RADIUS);
 }
 
 export function distanceFromCenter(point: SensorPoint) {
@@ -72,4 +77,8 @@ function limitToCircle(point: SensorPoint, maxRadius: number): SensorPoint {
     x: clamp(point.x * scale, -maxRadius, maxRadius),
     y: clamp(point.y * scale, -maxRadius, maxRadius),
   };
+}
+
+function isFinitePoint(point: SensorPoint): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }
