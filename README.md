@@ -1,4 +1,4 @@
-# single-lge-balance-webapp
+# single-leg-balance-webapp
 
 スマートフォンで使う、片脚バランストレーニング Web アプリです。
 DeviceOrientation を使って揺れを簡易表示し、セッションログを localStorage に保存します。
