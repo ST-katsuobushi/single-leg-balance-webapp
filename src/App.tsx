@@ -6,6 +6,8 @@ import type { DurationOption, Leg, Screen, SensorPoint, SessionLog, Settings } f
 const DURATION_OPTIONS: DurationOption[] = [20, 30, 60];
 const TARGET_RADIUS = 0.4;
 
+const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
+
 type DeviceOrientationEventWithPermission = {
   requestPermission?: () => Promise<'granted' | 'denied'>;
 };
@@ -19,6 +21,9 @@ function App() {
   const [rawOrientation, setRawOrientation] = useState<SensorPoint>({ x: 0, y: 0 });
   const [calibration, setCalibration] = useState<SensorPoint | null>(null);
   const [permissionError, setPermissionError] = useState<string>('');
+  const [isPortraitViewport, setIsPortraitViewport] = useState(() =>
+    window.matchMedia('(orientation: portrait)').matches,
+  );
 
   const startMsRef = useRef<number | null>(null);
   const swayValuesRef = useRef<number[]>([]);
@@ -26,12 +31,28 @@ function App() {
   const totalCountRef = useRef(0);
 
   useEffect(() => {
-    // 設定値を常に保持（前回選択の復元用）
+    const media = window.matchMedia('(orientation: portrait)');
+    const update = () => setIsPortraitViewport(media.matches);
+
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!isPortraitViewport && screen !== 'start') {
+      setScreen('start');
+      setCalibration(null);
+      setPosition({ x: 0, y: 0 });
+      setPermissionError('');
+    }
+  }, [isPortraitViewport, screen]);
+
+  useEffect(() => {
     saveSettings(settings);
   }, [settings]);
 
   useEffect(() => {
-    // センサー購読: 画面全体で受けるが、練習中のみ統計へ反映する
     const handleOrientation = (event: DeviceOrientationEvent) => {
       const latestRaw = {
         x: event.gamma ?? 0,
@@ -105,6 +126,11 @@ function App() {
   }
 
   async function goToPrepare() {
+    if (!isPortraitViewport) {
+      setPermissionError(PORTRAIT_LOCK_MESSAGE);
+      return;
+    }
+
     try {
       setPermissionError('');
       await requestMotionPermissionIfNeeded();
@@ -117,7 +143,6 @@ function App() {
   }
 
   function calibrate() {
-    // 現在姿勢を中心として保存
     setCalibration({ ...rawOrientation });
   }
 
@@ -172,118 +197,130 @@ function App() {
   }
 
   return (
-    <main className="app">
-      <section className="card">
-        {screen === 'start' && (
-          <>
-            <h1>片脚バランストレーニング</h1>
-            <p className="hint">横向きでスマホを持って開始してください。</p>
+    <main className="viewportRoot">
+      {!isPortraitViewport ? (
+        <section className="lockMessageCard" role="alert" aria-live="polite">
+          <h1>{PORTRAIT_LOCK_MESSAGE}</h1>
+          <p>縦長画面でのみ開始できます。</p>
+        </section>
+      ) : (
+        <div className="rotatedShell">
+          <div className="rotatedContent">
+            <section className="card">
+              {screen === 'start' && (
+                <>
+                  <h1>片脚バランストレーニング</h1>
+                  <p className="hint">端末を横向きで持ち、画面を顔側に向けて開始してください。</p>
 
-            <label className="label">脚の選択</label>
-            <div className="row">
-              <button
-                className={settings.leg === 'left' ? 'active' : ''}
-                onClick={() => setSettings((prev) => ({ ...prev, leg: 'left' }))}
-              >
-                左脚
-              </button>
-              <button
-                className={settings.leg === 'right' ? 'active' : ''}
-                onClick={() => setSettings((prev) => ({ ...prev, leg: 'right' }))}
-              >
-                右脚
-              </button>
-            </div>
+                  <label className="label">脚の選択</label>
+                  <div className="row">
+                    <button
+                      className={settings.leg === 'left' ? 'active' : ''}
+                      onClick={() => setSettings((prev) => ({ ...prev, leg: 'left' }))}
+                    >
+                      左脚
+                    </button>
+                    <button
+                      className={settings.leg === 'right' ? 'active' : ''}
+                      onClick={() => setSettings((prev) => ({ ...prev, leg: 'right' }))}
+                    >
+                      右脚
+                    </button>
+                  </div>
 
-            <label className="label">時間</label>
-            <div className="row">
-              {DURATION_OPTIONS.map((duration) => (
-                <button
-                  key={duration}
-                  className={settings.durationSec === duration ? 'active' : ''}
-                  onClick={() => setSettings((prev) => ({ ...prev, durationSec: duration }))}
-                >
-                  {duration}秒
-                </button>
-              ))}
-            </div>
+                  <label className="label">時間</label>
+                  <div className="row">
+                    {DURATION_OPTIONS.map((duration) => (
+                      <button
+                        key={duration}
+                        className={settings.durationSec === duration ? 'active' : ''}
+                        onClick={() => setSettings((prev) => ({ ...prev, durationSec: duration }))}
+                      >
+                        {duration}秒
+                      </button>
+                    ))}
+                  </div>
 
-            {permissionError && <p className="error">{permissionError}</p>}
-            <button className="primary" onClick={goToPrepare}>
-              開始
-            </button>
-          </>
-        )}
+                  {permissionError && <p className="error">{permissionError}</p>}
+                  <button className="primary" onClick={goToPrepare}>
+                    開始
+                  </button>
+                </>
+              )}
 
-        {screen === 'prepare' && (
-          <>
-            <h2>準備確認</h2>
-            <ul>
-              <li>スマホを横向きに両手で持つ</li>
-              <li>肩の高さで前に伸ばす</li>
-              <li>肘を伸ばし、上肢はできるだけ動かさない</li>
-            </ul>
+              {screen === 'prepare' && (
+                <>
+                  <h2>準備確認</h2>
+                  <ul>
+                    <li>スマホを横向きに両手で持つ</li>
+                    <li>肩の高さで前に伸ばす</li>
+                    <li>肘を伸ばし、上肢はできるだけ動かさない</li>
+                  </ul>
 
-            <button className="primary" onClick={calibrate}>
-              この姿勢で校正
-            </button>
-            <button className="secondary" disabled={!calibration} onClick={startCountdown}>
-              次へ
-            </button>
-          </>
-        )}
+                  <button className="primary" onClick={calibrate}>
+                    この姿勢で校正
+                  </button>
+                  <button className="secondary" disabled={!calibration} onClick={startCountdown}>
+                    次へ
+                  </button>
+                </>
+              )}
 
-        {screen === 'countdown' && (
-          <>
-            <h2>開始まで</h2>
-            <p className="big">{countdown}</p>
-          </>
-        )}
+              {screen === 'countdown' && (
+                <>
+                  <h2>開始まで</h2>
+                  <p className="big">{countdown}</p>
+                </>
+              )}
 
-        {screen === 'training' && (
-          <>
-            <h2>練習中（{settings.leg === 'left' ? '左脚' : '右脚'}）</h2>
-            <p className="timer">残り: {remainingSec} 秒</p>
+              {screen === 'training' && (
+                <>
+                  <h2>練習中（{settings.leg === 'left' ? '左脚' : '右脚'}）</h2>
+                  <p className="timer">残り: {remainingSec} 秒</p>
 
-            <div className="targetArea" aria-label="balance target area">
-              <div className="targetCircle" />
-              <div
-                className="dot"
-                style={{
-                  transform: `translate(${position.x * 90}px, ${position.y * 90}px)`,
-                }}
-              />
-            </div>
+                  <div className="targetArea" aria-label="balance target area">
+                    <div className="targetCircle" />
+                    <div
+                      className="dot"
+                      style={{
+                        left: `${50 + position.x * 40}%`,
+                        top: `${50 + position.y * 40}%`,
+                      }}
+                    />
+                  </div>
 
-            <button className="danger" onClick={() => finishSession(false)}>
-              停止
-            </button>
-          </>
-        )}
+                  <button className="danger" onClick={() => finishSession(false)}>
+                    停止
+                  </button>
+                </>
+              )}
 
-        {screen === 'finished' && (
-          <>
-            <h2>完了しました</h2>
-            <p className="hint">お疲れさまでした。</p>
-            <p className="hint">平均揺れ指標: {meanSway.toFixed(3)}</p>
-            <div className="column">
-              <button className="primary" onClick={goToPrepare}>
-                同じ条件でもう一回
-              </button>
-              <button
-                className="secondary"
-                onClick={() => {
-                  toggleLeg();
-                  goToPrepare();
-                }}
-              >
-                反対の脚で行う
-              </button>
-              <button onClick={goHome}>ホームへ戻る</button>
-            </div>
-          </>
-        )}
-      </section>
+              {screen === 'finished' && (
+                <>
+                  <h2>完了しました</h2>
+                  <p className="hint">お疲れさまでした。</p>
+                  <p className="hint">平均揺れ指標: {meanSway.toFixed(3)}</p>
+                  <div className="column">
+                    <button className="primary" onClick={goToPrepare}>
+                      同じ条件でもう一回
+                    </button>
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        toggleLeg();
+                        goToPrepare();
+                      }}
+                    >
+                      反対の脚で行う
+                    </button>
+                    <button onClick={goHome}>ホームへ戻る</button>
+                  </div>
+                </>
+              )}
+            </section>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
