@@ -14,8 +14,6 @@ import type { DurationOption, Leg, Screen, SensorPoint, SessionLog, Settings } f
 
 const DURATION_OPTIONS: DurationOption[] = [20, 30, 60];
 const TARGET_RADIUS = 0.4;
-const DOT_RANGE_X_PERCENT = 45;
-const DOT_RANGE_Y_PERCENT = 34;
 
 const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
 
@@ -42,6 +40,8 @@ function App() {
   const totalCountRef = useRef(0);
   const previousRawRef = useRef<SensorPoint | null>(null);
   const filteredPointRef = useRef<SensorPoint>({ x: 0, y: 0 });
+  const targetAreaRef = useRef<HTMLDivElement | null>(null);
+  const [targetRadiusPx, setTargetRadiusPx] = useState(0);
 
   useEffect(() => {
     const media = window.matchMedia('(orientation: portrait)');
@@ -72,6 +72,26 @@ function App() {
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
+
+  useEffect(() => {
+    const element = targetAreaRef.current;
+    if (!element) return;
+
+    const updateRadius = () => {
+      setTargetRadiusPx(element.clientWidth / 2);
+    };
+
+    updateRadius();
+
+    const observer = new ResizeObserver(updateRadius);
+    observer.observe(element);
+    window.addEventListener('resize', updateRadius);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateRadius);
+    };
+  }, [screen]);
 
   useEffect(() => {
     const handleOrientation = (event: DeviceOrientationEvent) => {
@@ -319,13 +339,14 @@ function App() {
                   <h2>練習中（{settings.leg === 'left' ? '左脚' : '右脚'}）</h2>
                   <p className="timer">残り: {remainingSec} 秒</p>
 
-                  <div className="targetArea" aria-label="balance target area">
+                  <div ref={targetAreaRef} className="targetArea" aria-label="balance target area">
                     <div className="targetCircle" />
                     <div
                       className="dot"
                       style={{
-                        left: `${50 + position.x * DOT_RANGE_X_PERCENT}%`,
-                        top: `${50 + position.y * DOT_RANGE_Y_PERCENT}%`,
+                        left: '50%',
+                        top: '50%',
+                        transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
                       }}
                     />
                   </div>
