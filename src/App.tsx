@@ -272,7 +272,7 @@ function App() {
               {screen === 'start' && (
                 <>
                   <h1>片脚バランストレーニング</h1>
-                  <p className="hint">端末を横向きで持ち、画面を顔側に向けて開始してください。</p>
+                  <p className="hint">端末を横向きで両手保持し、画面を天井向きにして開始してください。</p>
 
                   <label className="label">脚の選択</label>
                   <div className="row">
@@ -314,8 +314,8 @@ function App() {
                 <>
                   <h2>準備確認</h2>
                   <ul>
-                    <li>スマホを横向きに両手で持つ</li>
-                    <li>肩の高さで前に伸ばす</li>
+                    <li>スマホを横向きに両手で持ち、画面を天井向きにする</li>
+                    <li>肩関節90°屈曲（肩の高さ）で前に伸ばす</li>
                     <li>肘を伸ばし、上肢はできるだけ動かさない</li>
                   </ul>
 
