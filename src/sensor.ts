@@ -2,13 +2,15 @@ import type { SensorPoint } from './types';
 
 export const EDGE_TILT_DEG = 45;
 export const INPUT_TILT_CLAMP_DEG = 70;
-export const SMOOTHING_ALPHA_X = 0.36;
-export const SMOOTHING_ALPHA_Y = 0.28;
-export const RAW_JUMP_REJECT_DEG = 30;
-export const AXIS_STEP_LIMIT_X = 0.24;
-export const AXIS_STEP_LIMIT_Y = 0.14;
-export const AXIS_STEP_LIMIT_Y_FORWARD = 0.09;
-export const AXIS_STEP_LIMIT_Y_BACKWARD = 0.07;
+export const SMOOTHING_ALPHA_X = 0.34;
+export const SMOOTHING_ALPHA_Y = 0.2;
+export const RAW_JUMP_REJECT_DEG = 28;
+export const AXIS_STEP_LIMIT_X = 0.2;
+export const AXIS_STEP_LIMIT_Y = 0.08;
+export const AXIS_STEP_LIMIT_Y_FORWARD = 0.06;
+export const AXIS_STEP_LIMIT_Y_BACKWARD = 0.05;
+export const AXIS_DEADZONE_DEG_X = 1.2;
+export const AXIS_DEADZONE_DEG_Y = 2.2;
 
 export const AXIS_MAPPING = {
   x: 'gamma',
@@ -43,8 +45,8 @@ export function pointFromOrientation(
   const dxDeg = clamp(angularDelta(mapped.x, calibration.x), -INPUT_TILT_CLAMP_DEG, INPUT_TILT_CLAMP_DEG);
   const dyDeg = clamp(angularDelta(mapped.y, calibration.y), -INPUT_TILT_CLAMP_DEG, INPUT_TILT_CLAMP_DEG);
 
-  const xDegSigned = dxDeg * AXIS_SIGNS.x;
-  const yDegSigned = dyDeg * AXIS_SIGNS.y;
+  const xDegSigned = applyDeadzone(dxDeg * AXIS_SIGNS.x, AXIS_DEADZONE_DEG_X);
+  const yDegSigned = applyDeadzone(dyDeg * AXIS_SIGNS.y, AXIS_DEADZONE_DEG_Y);
 
   const normalized = {
     x: normalizeToDisplayRange(xDegSigned),
@@ -85,6 +87,13 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
 
 function normalizeToDisplayRange(valueDeg: number): number {
   return clamp(valueDeg / EDGE_TILT_DEG, -1, 1);
+}
+
+function applyDeadzone(valueDeg: number, deadzoneDeg: number): number {
+  if (Math.abs(valueDeg) <= deadzoneDeg) {
+    return 0;
+  }
+  return Math.sign(valueDeg) * (Math.abs(valueDeg) - deadzoneDeg);
 }
 
 function capDelta(delta: number, maxStep: number): number {
