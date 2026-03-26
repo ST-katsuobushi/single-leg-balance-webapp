@@ -8,38 +8,70 @@
   box-sizing: border-box;
 }
 
-body {
+html,
+body,
+#root {
   margin: 0;
-  min-height: 100vh;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
-.app {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
+.viewportRoot {
+  width: 100dvw;
+  height: 100dvh;
+  background: #f4f6f8;
 }
 
-.card {
-  width: min(680px, 100%);
+.rotatedShell {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.rotatedContent {
+  width: 100dvh;
+  height: 100dvw;
+  transform-origin: top left;
+  transform: rotate(90deg) translateY(-100%);
+  display: grid;
+  place-items: center;
+  padding: clamp(8px, 1.8dvh, 16px);
+}
+
+.card,
+.lockMessageCard {
+  width: min(96dvh, 900px);
+  max-height: calc(100dvw - clamp(16px, 4dvw, 24px));
+  overflow: auto;
   background: #fff;
   border-radius: 16px;
-  padding: 24px;
+  padding: clamp(12px, 2.2dvw, 20px);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
 }
 
 h1,
 h2 {
-  margin-top: 0;
+  margin: 0 0 clamp(8px, 1.4dvw, 12px);
+  font-size: clamp(20px, 2.6dvw, 28px);
+}
+
+p,
+li,
+button,
+label {
+  font-size: clamp(14px, 1.85dvw, 18px);
 }
 
 .hint {
   color: #4a5568;
+  margin: 0 0 8px;
 }
 
 .label {
-  margin-top: 16px;
+  margin-top: 10px;
   display: block;
   font-weight: 600;
 }
@@ -48,21 +80,20 @@ h2 {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin: 8px 0 16px;
+  margin: 8px 0 12px;
 }
 
 .column {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 button {
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: clamp(8px, 1.2dvw, 10px) clamp(10px, 1.6dvw, 14px);
   background: #fff;
-  font-size: 16px;
 }
 
 button.active,
@@ -91,20 +122,21 @@ button:disabled {
 }
 
 .big {
-  font-size: 72px;
+  font-size: clamp(56px, 12dvw, 88px);
   text-align: center;
-  margin: 16px 0;
+  margin: 10px 0;
 }
 
 .timer {
-  font-size: 20px;
+  font-size: clamp(18px, 2.2dvw, 24px);
   font-weight: 700;
+  margin: 0;
 }
 
 .targetArea {
-  margin: 18px auto;
-  width: 280px;
-  height: 280px;
+  margin: clamp(10px, 1.8dvw, 14px) auto;
+  width: clamp(180px, 42dvw, 320px);
+  aspect-ratio: 1;
   position: relative;
   border-radius: 50%;
   border: 2px dashed #94a3b8;
@@ -114,32 +146,23 @@ button:disabled {
 }
 
 .targetCircle {
-  width: 90px;
-  height: 90px;
+  width: 32%;
+  aspect-ratio: 1;
   border-radius: 50%;
   border: 2px solid #22c55e;
 }
 
 .dot {
-  width: 18px;
-  height: 18px;
+  width: clamp(12px, 2.8dvw, 18px);
+  aspect-ratio: 1;
   border-radius: 50%;
   background: #111827;
   position: absolute;
-  left: calc(50% - 9px);
-  top: calc(50% - 9px);
+  transform: translate(-50%, -50%);
 }
 
-@media (orientation: portrait) {
-  .card::before {
-    content: '横向きにしてご利用ください';
-    display: block;
-    background: #fff7ed;
-    border: 1px solid #fb923c;
-    color: #9a3412;
-    border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 12px;
-    text-align: center;
-  }
+.lockMessageCard {
+  width: min(92dvw, 640px);
+  text-align: center;
+  border: 2px solid #fb923c;
 }
