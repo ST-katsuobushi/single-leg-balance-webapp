@@ -13,13 +13,13 @@ export const AXIS_DEADZONE_DEG_X = 1.2;
 export const AXIS_DEADZONE_DEG_Y = 2.2;
 
 export const AXIS_MAPPING = {
-  x: 'gamma',
-  y: 'beta',
+  x: 'beta',
+  y: 'gamma',
 } as const;
 
 export const AXIS_SIGNS = {
   x: 1,
-  y: -1,
+  y: 1,
 } as const;
 
 export const MAX_RADIUS = 1;
