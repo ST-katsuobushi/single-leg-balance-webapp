@@ -336,26 +336,32 @@ function App() {
               )}
 
               {screen === 'training' && (
-                <>
-                  <h2>練習中（{settings.leg === 'left' ? '左脚' : '右脚'}）</h2>
-                  <p className="timer">残り: {remainingSec} 秒</p>
+                <div className="trainingLayout">
+                  <header className="trainingTop">
+                    <h2>練習中（{settings.leg === 'left' ? '左脚' : '右脚'}）</h2>
+                    <p className="timer">残り: {remainingSec} 秒</p>
+                  </header>
 
-                  <div ref={targetAreaRef} className="targetArea" aria-label="balance target area">
-                    <div className="targetCircle" />
-                    <div
-                      className="dot"
-                      style={{
-                        left: '50%',
-                        top: '50%',
-                        transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
-                      }}
-                    />
+                  <div className="trainingMiddle">
+                    <div ref={targetAreaRef} className="targetArea" aria-label="balance target area">
+                      <div className="targetCircle" />
+                      <div
+                        className="dot"
+                        style={{
+                          left: '50%',
+                          top: '50%',
+                          transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
+                        }}
+                      />
+                    </div>
                   </div>
 
-                  <button className="danger" onClick={() => finishSession(false)}>
-                    停止
-                  </button>
-                </>
+                  <footer className="trainingBottom">
+                    <button className="danger trainingStop" onClick={() => finishSession(false)}>
+                      停止
+                    </button>
+                  </footer>
+                </div>
               )}
 
               {screen === 'finished' && (
