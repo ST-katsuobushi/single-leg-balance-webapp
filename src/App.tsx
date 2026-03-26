@@ -78,7 +78,8 @@ function App() {
     if (!element) return;
 
     const updateRadius = () => {
-      setTargetRadiusPx(element.clientWidth / 2);
+      const rect = element.getBoundingClientRect();
+      setTargetRadiusPx(Math.min(rect.width, rect.height) / 2);
     };
 
     updateRadius();
