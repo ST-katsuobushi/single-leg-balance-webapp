@@ -1,0 +1,145 @@
+:root {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1d1d1f;
+  background: #f4f6f8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.card {
+  width: min(680px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+h1,
+h2 {
+  margin-top: 0;
+}
+
+.hint {
+  color: #4a5568;
+}
+
+.label {
+  margin-top: 16px;
+  display: block;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 16px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+button {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #fff;
+  font-size: 16px;
+}
+
+button.active,
+button.primary {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+button.secondary {
+  background: #e2e8f0;
+}
+
+button.danger {
+  background: #dc2626;
+  color: white;
+  border-color: #dc2626;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+.error {
+  color: #c53030;
+}
+
+.big {
+  font-size: 72px;
+  text-align: center;
+  margin: 16px 0;
+}
+
+.timer {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.targetArea {
+  margin: 18px auto;
+  width: 280px;
+  height: 280px;
+  position: relative;
+  border-radius: 50%;
+  border: 2px dashed #94a3b8;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.targetCircle {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 2px solid #22c55e;
+}
+
+.dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #111827;
+  position: absolute;
+  left: calc(50% - 9px);
+  top: calc(50% - 9px);
+}
+
+@media (orientation: portrait) {
+  .card::before {
+    content: '横向きにしてご利用ください';
+    display: block;
+    background: #fff7ed;
+    border: 1px solid #fb923c;
+    color: #9a3412;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+}
