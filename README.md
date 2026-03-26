@@ -13,6 +13,18 @@ npm run dev
 - 開発サーバー起動後、表示された URL をスマートフォンブラウザで開いてください。
 - iOS Safari はセンサー許可ダイアログが出るため、許可が必要です。
 
+## GitHub Pages での公開
+
+このリポジトリは GitHub Actions で Pages にデプロイする設定です（`.github/workflows/deploy.yml`）。
+
+1. `main` ブランチに変更を push します。
+2. GitHub リポジトリの **Settings > Pages** を開きます。
+3. **Source** を **GitHub Actions** に設定します。
+4. Actions の `Deploy to GitHub Pages` ワークフロー完了後に公開されます。
+
+公開 URL 例:
+- `https://st-katsuobushi.github.io/single-leg-balance-webapp/`
+
 ## 実装済み画面
 
 1. 開始画面（脚・時間の選択、開始、前回設定保持）
