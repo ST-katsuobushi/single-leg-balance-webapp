@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { appendSessionLog, loadSettings, saveSettings } from './storage';
-import { distanceFromCenter, pointFromOrientation } from './sensor';
+import {
+  RAW_JUMP_REJECT_DEG,
+  SMOOTHING_ALPHA,
+  distanceFromCenter,
+  mapOrientation,
+  pointFromOrientation,
+  shouldRejectRawJump,
+  smoothPoint,
+} from './sensor';
 import type { DurationOption, Leg, Screen, SensorPoint, SessionLog, Settings } from './types';
 
 const DURATION_OPTIONS: DurationOption[] = [20, 30, 60];
@@ -29,6 +37,8 @@ function App() {
   const swayValuesRef = useRef<number[]>([]);
   const inTargetCountRef = useRef(0);
   const totalCountRef = useRef(0);
+  const previousRawRef = useRef<SensorPoint | null>(null);
+  const filteredPointRef = useRef<SensorPoint>({ x: 0, y: 0 });
 
   useEffect(() => {
     const media = window.matchMedia('(orientation: portrait)');
@@ -50,6 +60,8 @@ function App() {
       setScreen('start');
       setCalibration(null);
       setPosition({ x: 0, y: 0 });
+      previousRawRef.current = null;
+      filteredPointRef.current = { x: 0, y: 0 };
       setPermissionError('');
     }
   }, [isPortraitViewport, screen]);
@@ -60,19 +72,27 @@ function App() {
 
   useEffect(() => {
     const handleOrientation = (event: DeviceOrientationEvent) => {
-      const latestRaw = {
-        x: event.gamma ?? 0,
-        y: event.beta ?? 0,
-      };
+      const latestRaw = mapOrientation(event);
       setRawOrientation(latestRaw);
 
       if (!calibration) return;
 
-      const p = pointFromOrientation(event, calibration);
-      setPosition(p);
+      if (
+        previousRawRef.current &&
+        shouldRejectRawJump(latestRaw, previousRawRef.current, RAW_JUMP_REJECT_DEG)
+      ) {
+        previousRawRef.current = latestRaw;
+        return;
+      }
+
+      const instantPoint = pointFromOrientation(event, calibration);
+      const smoothedPoint = smoothPoint(instantPoint, filteredPointRef.current, SMOOTHING_ALPHA);
+      filteredPointRef.current = smoothedPoint;
+      previousRawRef.current = latestRaw;
+      setPosition(smoothedPoint);
 
       if (screen === 'training') {
-        const d = distanceFromCenter(p);
+        const d = distanceFromCenter(smoothedPoint);
         swayValuesRef.current.push(d);
         totalCountRef.current += 1;
         if (d <= TARGET_RADIUS) {
@@ -142,6 +162,8 @@ function App() {
       await requestMotionPermissionIfNeeded();
       setCalibration(null);
       setPosition({ x: 0, y: 0 });
+      previousRawRef.current = null;
+      filteredPointRef.current = { x: 0, y: 0 };
       setScreen('prepare');
     } catch (error) {
       setPermissionError(error instanceof Error ? error.message : '不明なエラーが発生しました。');
@@ -150,6 +172,9 @@ function App() {
 
   function calibrate() {
     setCalibration({ ...rawOrientation });
+    previousRawRef.current = rawOrientation;
+    filteredPointRef.current = { x: 0, y: 0 };
+    setPosition({ x: 0, y: 0 });
   }
 
   function startCountdown() {
@@ -193,6 +218,8 @@ function App() {
   function goHome() {
     setCalibration(null);
     setPosition({ x: 0, y: 0 });
+    previousRawRef.current = null;
+    filteredPointRef.current = { x: 0, y: 0 };
     setRemainingSec(settings.durationSec);
     setScreen('start');
   }
