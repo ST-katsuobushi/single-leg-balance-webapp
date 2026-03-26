@@ -2,9 +2,6 @@ import type { SensorPoint } from './types';
 
 export const EDGE_TILT_DEG = 45;
 export const INPUT_TILT_CLAMP_DEG = 70;
-export const SENSOR_SENSITIVITY_X_DEG = 18;
-export const SENSOR_SENSITIVITY_Y_FORWARD_DEG = 24;
-export const SENSOR_SENSITIVITY_Y_BACKWARD_DEG = 34;
 export const SMOOTHING_ALPHA_X = 0.36;
 export const SMOOTHING_ALPHA_Y = 0.28;
 export const RAW_JUMP_REJECT_DEG = 30;
@@ -50,11 +47,8 @@ export function pointFromOrientation(
   const yDegSigned = dyDeg * AXIS_SIGNS.y;
 
   const normalized = {
-    x: normalizeToDisplayRange(xDegSigned, EDGE_TILT_DEG / SENSOR_SENSITIVITY_X_DEG),
-    y: normalizeToDisplayRange(
-      yDegSigned,
-      EDGE_TILT_DEG / (yDegSigned < 0 ? SENSOR_SENSITIVITY_Y_BACKWARD_DEG : SENSOR_SENSITIVITY_Y_FORWARD_DEG),
-    ),
+    x: normalizeToDisplayRange(xDegSigned),
+    y: normalizeToDisplayRange(yDegSigned),
   };
 
   return limitToCircle(normalized, MAX_RADIUS);
@@ -89,8 +83,8 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
   );
 }
 
-function normalizeToDisplayRange(valueDeg: number, gain = 1): number {
-  return clamp((valueDeg / EDGE_TILT_DEG) * gain, -1, 1);
+function normalizeToDisplayRange(valueDeg: number): number {
+  return clamp(valueDeg / EDGE_TILT_DEG, -1, 1);
 }
 
 function capDelta(delta: number, maxStep: number): number {
