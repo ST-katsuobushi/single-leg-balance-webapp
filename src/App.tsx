@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { appendSessionLog, loadSettings, saveSettings } from './storage';
 import {
   RAW_JUMP_REJECT_DEG,
-  SMOOTHING_ALPHA,
+  SMOOTHING_ALPHA_X,
+  SMOOTHING_ALPHA_Y,
   distanceFromCenter,
   mapOrientation,
   pointFromOrientation,
@@ -86,7 +87,12 @@ function App() {
       }
 
       const instantPoint = pointFromOrientation(event, calibration);
-      const smoothedPoint = smoothPoint(instantPoint, filteredPointRef.current, SMOOTHING_ALPHA);
+      const smoothedPoint = smoothPoint(
+        instantPoint,
+        filteredPointRef.current,
+        SMOOTHING_ALPHA_X,
+        SMOOTHING_ALPHA_Y,
+      );
       filteredPointRef.current = smoothedPoint;
       previousRawRef.current = latestRaw;
       setPosition(smoothedPoint);

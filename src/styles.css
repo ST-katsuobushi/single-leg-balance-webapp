@@ -27,8 +27,8 @@ body,
   --shell-padding: clamp(8px, 2dvh, 16px);
   --usable-width: calc(100dvh - (var(--shell-padding) * 2));
   --usable-height: calc(100dvw - (var(--shell-padding) * 2));
-  --frame-width: min(430px, calc(var(--usable-height) * 0.94));
-  --frame-height: min(680px, calc(var(--usable-width) * 0.88));
+  --frame-width: min(400px, calc(var(--usable-height) * 0.9));
+  --frame-height: min(560px, calc(var(--usable-width) * 0.74));
   --frame-base: min(var(--frame-width), calc(var(--frame-height) * 0.64));
   --title-size: clamp(13px, calc(var(--frame-base) * 0.047), 24px);
   --text-size: clamp(10px, calc(var(--frame-base) * 0.033), 16px);
