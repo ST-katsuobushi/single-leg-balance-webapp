@@ -24,6 +24,17 @@ body,
 }
 
 .rotatedShell {
+  --shell-padding: clamp(6px, 1.6dvh, 14px);
+  --frame-radius: clamp(10px, 1.8dvh, 16px);
+  --frame-width: min(900px, calc(100dvh - (var(--shell-padding) * 2)));
+  --frame-height: min(620px, calc(100dvw - (var(--shell-padding) * 2)));
+  --frame-base: min(var(--frame-width), var(--frame-height));
+  --title-size: clamp(14px, calc(var(--frame-base) * 0.045), 28px);
+  --text-size: clamp(11px, calc(var(--frame-base) * 0.031), 18px);
+  --button-vpad: clamp(5px, calc(var(--frame-height) * 0.016), 10px);
+  --button-hpad: clamp(8px, calc(var(--frame-width) * 0.022), 14px);
+  --target-size: clamp(110px, calc(var(--frame-height) * 0.46), 320px);
+  --dot-size: clamp(8px, calc(var(--frame-base) * 0.03), 18px);
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -38,61 +49,66 @@ body,
   transform: rotate(90deg) translateY(-100%);
   display: grid;
   place-items: center;
-  padding: clamp(8px, 1.8dvh, 16px);
+  padding: var(--shell-padding);
 }
 
 .card,
 .lockMessageCard {
-  width: min(96dvh, 900px);
-  max-height: calc(100dvw - clamp(16px, 4dvw, 24px));
-  overflow: auto;
+  width: var(--frame-width);
+  height: var(--frame-height);
+  overflow: hidden;
   background: #fff;
-  border-radius: 16px;
-  padding: clamp(12px, 2.2dvw, 20px);
+  border-radius: var(--frame-radius);
+  padding: clamp(8px, calc(var(--frame-base) * 0.03), 20px);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(4px, calc(var(--frame-base) * 0.01), 12px);
 }
 
 h1,
 h2 {
-  margin: 0 0 clamp(8px, 1.4dvw, 12px);
-  font-size: clamp(20px, 2.6dvw, 28px);
+  margin: 0;
+  font-size: var(--title-size);
+  line-height: 1.2;
 }
 
 p,
 li,
 button,
 label {
-  font-size: clamp(14px, 1.85dvw, 18px);
+  font-size: var(--text-size);
+  line-height: 1.3;
 }
 
 .hint {
   color: #4a5568;
-  margin: 0 0 8px;
+  margin: 0;
 }
 
 .label {
-  margin-top: 10px;
+  margin-top: clamp(2px, calc(var(--frame-base) * 0.006), 10px);
   display: block;
   font-weight: 600;
 }
 
 .row {
   display: flex;
-  gap: 8px;
+  gap: clamp(4px, calc(var(--frame-base) * 0.01), 8px);
   flex-wrap: wrap;
-  margin: 8px 0 12px;
+  margin: 0;
 }
 
 .column {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: clamp(4px, calc(var(--frame-base) * 0.01), 8px);
 }
 
 button {
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  padding: clamp(8px, 1.2dvw, 10px) clamp(10px, 1.6dvw, 14px);
+  padding: var(--button-vpad) var(--button-hpad);
   background: #fff;
 }
 
@@ -122,20 +138,20 @@ button:disabled {
 }
 
 .big {
-  font-size: clamp(56px, 12dvw, 88px);
+  font-size: clamp(40px, calc(var(--frame-height) * 0.18), 88px);
   text-align: center;
-  margin: 10px 0;
+  margin: 0;
 }
 
 .timer {
-  font-size: clamp(18px, 2.2dvw, 24px);
+  font-size: clamp(14px, calc(var(--frame-base) * 0.038), 24px);
   font-weight: 700;
   margin: 0;
 }
 
 .targetArea {
-  margin: clamp(10px, 1.8dvw, 14px) auto;
-  width: clamp(180px, 42dvw, 320px);
+  margin: 0 auto;
+  width: var(--target-size);
   aspect-ratio: 1;
   position: relative;
   border-radius: 50%;
@@ -153,7 +169,7 @@ button:disabled {
 }
 
 .dot {
-  width: clamp(12px, 2.8dvw, 18px);
+  width: var(--dot-size);
   aspect-ratio: 1;
   border-radius: 50%;
   background: #111827;
@@ -163,6 +179,12 @@ button:disabled {
 
 .lockMessageCard {
   width: min(92dvw, 640px);
+  height: auto;
   text-align: center;
   border: 2px solid #fb923c;
+}
+
+ul {
+  margin: 0;
+  padding-left: clamp(16px, calc(var(--frame-base) * 0.04), 28px);
 }
