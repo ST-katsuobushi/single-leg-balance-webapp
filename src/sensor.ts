@@ -1,12 +1,14 @@
 import type { SensorPoint } from './types';
 
-export const SENSOR_SENSITIVITY_X_DEG = 24;
-export const SENSOR_SENSITIVITY_Y_DEG = 23;
-export const SMOOTHING_ALPHA_X = 0.24;
-export const SMOOTHING_ALPHA_Y = 0.34;
+export const SENSOR_SENSITIVITY_X_DEG = 21;
+export const SENSOR_SENSITIVITY_Y_DEG = 24;
+export const SMOOTHING_ALPHA_X = 0.32;
+export const SMOOTHING_ALPHA_Y = 0.26;
 export const RAW_JUMP_REJECT_DEG = 30;
 export const MAX_TILT_DEG = 65;
-export const AXIS_STEP_LIMIT_DEG = 10;
+export const AXIS_STEP_LIMIT_X = 0.22;
+export const AXIS_STEP_LIMIT_Y = 0.16;
+export const AXIS_STEP_LIMIT_Y_FORWARD = 0.1;
 
 export const AXIS_MAPPING = {
   x: 'beta',
@@ -61,9 +63,10 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
   const wx = clamp(alphaX, 0, 1);
   const wy = clamp(alphaY, 0, 1);
 
+  const stepLimitY = next.y < prev.y ? AXIS_STEP_LIMIT_Y_FORWARD : AXIS_STEP_LIMIT_Y;
   const limitedNext = {
-    x: prev.x + clamp(next.x - prev.x, -1, 1) * (AXIS_STEP_LIMIT_DEG / MAX_TILT_DEG),
-    y: prev.y + clamp(next.y - prev.y, -1, 1) * (AXIS_STEP_LIMIT_DEG / MAX_TILT_DEG),
+    x: prev.x + capDelta(next.x - prev.x, AXIS_STEP_LIMIT_X),
+    y: prev.y + capDelta(next.y - prev.y, stepLimitY),
   };
 
   return limitToCircle(
@@ -73,6 +76,13 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
     },
     MAX_RADIUS,
   );
+}
+
+function capDelta(delta: number, maxStep: number): number {
+  if (Math.abs(delta) <= maxStep) {
+    return delta;
+  }
+  return Math.sign(delta) * maxStep;
 }
 
 export function distanceFromCenter(point: SensorPoint) {
