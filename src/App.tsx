@@ -14,6 +14,8 @@ import type { DurationOption, Leg, Screen, SensorPoint, SessionLog, Settings } f
 
 const DURATION_OPTIONS: DurationOption[] = [20, 30, 60];
 const TARGET_RADIUS = 0.4;
+const DOT_RANGE_X_PERCENT = 45;
+const DOT_RANGE_Y_PERCENT = 34;
 
 const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
 
@@ -322,8 +324,8 @@ function App() {
                     <div
                       className="dot"
                       style={{
-                        left: `${50 + position.x * 40}%`,
-                        top: `${50 + position.y * 40}%`,
+                        left: `${50 + position.x * DOT_RANGE_X_PERCENT}%`,
+                        top: `${50 + position.y * DOT_RANGE_Y_PERCENT}%`,
                       }}
                     />
                   </div>
