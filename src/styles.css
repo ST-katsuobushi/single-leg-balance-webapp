@@ -46,8 +46,8 @@ body,
 .rotatedContent {
   width: 100dvh;
   height: 100dvw;
-  transform-origin: top left;
-  transform: rotate(90deg) translateY(-100%);
+  transform-origin: center center;
+  transform: rotate(90deg);
   display: grid;
   place-items: center;
   padding: var(--shell-padding);
