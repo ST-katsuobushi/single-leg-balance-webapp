@@ -1,31 +1,58 @@
 import type { SensorPoint } from './types';
 
-// 後から調整しやすいよう、感度・軸設定を定数化
-export const SENSOR_SENSITIVITY_DEG = 20;
+export const SENSOR_SENSITIVITY_DEG = 24;
+export const SMOOTHING_ALPHA = 0.25;
+export const RAW_JUMP_REJECT_DEG = 22;
+
+export const AXIS_MAPPING = {
+  x: 'beta',
+  y: 'gamma',
+} as const;
+
 export const AXIS_SIGNS = {
   x: 1,
   y: -1,
 } as const;
+
 export const MAX_RADIUS = 0.96;
 
-/**
- * DeviceOrientation から最小限の 2D 揺れ指標を作る。
- * 端末を横向き保持（ただし画面は縦固定）した利用を前提に、
- * 体感的に直感へ寄せた軸変換を行う。
- */
+export function mapOrientation(event: DeviceOrientationEvent): SensorPoint {
+  const beta = event.beta ?? 0;
+  const gamma = event.gamma ?? 0;
+
+  const axisValue = { beta, gamma };
+
+  return {
+    x: axisValue[AXIS_MAPPING.x],
+    y: axisValue[AXIS_MAPPING.y],
+  };
+}
+
 export function pointFromOrientation(
   event: DeviceOrientationEvent,
   calibration: SensorPoint,
 ): SensorPoint {
-  const rawGamma = event.gamma ?? 0;
-  const rawBeta = event.beta ?? 0;
+  const mapped = mapOrientation(event);
 
-  // キャリブレーションとの差分で現在位置を決定
-  const dx = ((rawGamma - calibration.x) / SENSOR_SENSITIVITY_DEG) * AXIS_SIGNS.x;
-  const dy = ((rawBeta - calibration.y) / SENSOR_SENSITIVITY_DEG) * AXIS_SIGNS.y;
+  const dx = ((mapped.x - calibration.x) / SENSOR_SENSITIVITY_DEG) * AXIS_SIGNS.x;
+  const dy = ((mapped.y - calibration.y) / SENSOR_SENSITIVITY_DEG) * AXIS_SIGNS.y;
 
-  // 画面外に出ないよう円内に制限
   return limitToCircle({ x: dx, y: dy }, MAX_RADIUS);
+}
+
+export function shouldRejectRawJump(currentRaw: SensorPoint, previousRaw: SensorPoint, maxDeltaDeg: number) {
+  return (
+    Math.abs(currentRaw.x - previousRaw.x) > maxDeltaDeg ||
+    Math.abs(currentRaw.y - previousRaw.y) > maxDeltaDeg
+  );
+}
+
+export function smoothPoint(next: SensorPoint, prev: SensorPoint, alpha: number): SensorPoint {
+  const w = clamp(alpha, 0, 1);
+  return {
+    x: prev.x + (next.x - prev.x) * w,
+    y: prev.y + (next.y - prev.y) * w,
+  };
 }
 
 export function distanceFromCenter(point: SensorPoint) {

@@ -45,11 +45,15 @@ npm run dev
 
 ## 練習画面の点の挙動
 
-- 軸と感度は `src/sensor.ts` の定数で調整可能
+- 軸・感度・安定化は `src/sensor.ts` の定数で調整可能
+  - `AXIS_MAPPING`（現在は `x=beta`, `y=gamma`）
+  - `AXIS_SIGNS`（必要に応じた符号反転）
   - `SENSOR_SENSITIVITY_DEG`（小さいほど高感度）
-  - `AXIS_SIGNS`（軸反転の調整）
+  - `SMOOTHING_ALPHA`（0〜1、値が小さいほどなめらか）
+  - `RAW_JUMP_REJECT_DEG`（急変値を無視するしきい値）
   - `MAX_RADIUS`（点が到達可能な最大半径）
-- 点は円内に制限され、画面外へ出ない
+- 処理は「キャリブレーション差分 → 急変除外 → 平滑化 → 円内制限」の順で行う
+- 点は常に円内に収まる
 
 ## ログ保存
 
