@@ -1,26 +1,29 @@
 import type { SensorPoint } from './types';
 
-export const SENSOR_SENSITIVITY_X_DEG = 21;
-export const SENSOR_SENSITIVITY_Y_DEG = 24;
-export const SMOOTHING_ALPHA_X = 0.32;
-export const SMOOTHING_ALPHA_Y = 0.26;
+export const EDGE_TILT_DEG = 45;
+export const INPUT_TILT_CLAMP_DEG = 70;
+export const SENSOR_SENSITIVITY_X_DEG = 18;
+export const SENSOR_SENSITIVITY_Y_FORWARD_DEG = 24;
+export const SENSOR_SENSITIVITY_Y_BACKWARD_DEG = 34;
+export const SMOOTHING_ALPHA_X = 0.36;
+export const SMOOTHING_ALPHA_Y = 0.28;
 export const RAW_JUMP_REJECT_DEG = 30;
-export const MAX_TILT_DEG = 65;
-export const AXIS_STEP_LIMIT_X = 0.22;
-export const AXIS_STEP_LIMIT_Y = 0.16;
-export const AXIS_STEP_LIMIT_Y_FORWARD = 0.1;
+export const AXIS_STEP_LIMIT_X = 0.24;
+export const AXIS_STEP_LIMIT_Y = 0.14;
+export const AXIS_STEP_LIMIT_Y_FORWARD = 0.09;
+export const AXIS_STEP_LIMIT_Y_BACKWARD = 0.07;
 
 export const AXIS_MAPPING = {
-  x: 'beta',
-  y: 'gamma',
+  x: 'gamma',
+  y: 'beta',
 } as const;
 
 export const AXIS_SIGNS = {
-  x: -1,
+  x: 1,
   y: -1,
 } as const;
 
-export const MAX_RADIUS = 0.96;
+export const MAX_RADIUS = 1;
 
 export function mapOrientation(event: DeviceOrientationEvent): SensorPoint {
   const beta = normalizeAngle(event.beta ?? 0);
@@ -40,13 +43,21 @@ export function pointFromOrientation(
 ): SensorPoint {
   const mapped = mapOrientation(event);
 
-  const dxDeg = clamp(angularDelta(mapped.x, calibration.x), -MAX_TILT_DEG, MAX_TILT_DEG);
-  const dyDeg = clamp(angularDelta(mapped.y, calibration.y), -MAX_TILT_DEG, MAX_TILT_DEG);
+  const dxDeg = clamp(angularDelta(mapped.x, calibration.x), -INPUT_TILT_CLAMP_DEG, INPUT_TILT_CLAMP_DEG);
+  const dyDeg = clamp(angularDelta(mapped.y, calibration.y), -INPUT_TILT_CLAMP_DEG, INPUT_TILT_CLAMP_DEG);
 
-  const dx = (dxDeg / SENSOR_SENSITIVITY_X_DEG) * AXIS_SIGNS.x;
-  const dy = (dyDeg / SENSOR_SENSITIVITY_Y_DEG) * AXIS_SIGNS.y;
+  const xDegSigned = dxDeg * AXIS_SIGNS.x;
+  const yDegSigned = dyDeg * AXIS_SIGNS.y;
 
-  return limitToCircle({ x: dx, y: dy }, MAX_RADIUS);
+  const normalized = {
+    x: normalizeToDisplayRange(xDegSigned, EDGE_TILT_DEG / SENSOR_SENSITIVITY_X_DEG),
+    y: normalizeToDisplayRange(
+      yDegSigned,
+      EDGE_TILT_DEG / (yDegSigned < 0 ? SENSOR_SENSITIVITY_Y_BACKWARD_DEG : SENSOR_SENSITIVITY_Y_FORWARD_DEG),
+    ),
+  };
+
+  return limitToCircle(normalized, MAX_RADIUS);
 }
 
 export function shouldRejectRawJump(currentRaw: SensorPoint, previousRaw: SensorPoint, maxDeltaDeg: number) {
@@ -63,10 +74,10 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
   const wx = clamp(alphaX, 0, 1);
   const wy = clamp(alphaY, 0, 1);
 
-  const stepLimitY = next.y < prev.y ? AXIS_STEP_LIMIT_Y_FORWARD : AXIS_STEP_LIMIT_Y;
+  const stepLimitY = next.y < prev.y ? AXIS_STEP_LIMIT_Y_FORWARD : AXIS_STEP_LIMIT_Y_BACKWARD;
   const limitedNext = {
     x: prev.x + capDelta(next.x - prev.x, AXIS_STEP_LIMIT_X),
-    y: prev.y + capDelta(next.y - prev.y, stepLimitY),
+    y: prev.y + capDelta(next.y - prev.y, Math.min(AXIS_STEP_LIMIT_Y, stepLimitY)),
   };
 
   return limitToCircle(
@@ -76,6 +87,10 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
     },
     MAX_RADIUS,
   );
+}
+
+function normalizeToDisplayRange(valueDeg: number, gain = 1): number {
+  return clamp((valueDeg / EDGE_TILT_DEG) * gain, -1, 1);
 }
 
 function capDelta(delta: number, maxStep: number): number {

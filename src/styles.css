@@ -24,20 +24,22 @@ body,
 }
 
 .rotatedShell {
-  --shell-padding: clamp(8px, 1.8dvh, 14px);
+  --screen-short: min(100dvw, 100dvh);
+  --screen-long: max(100dvw, 100dvh);
+  --shell-padding: calc(var(--screen-short) * 0.025);
   --usable-width: calc(100dvh - (var(--shell-padding) * 2));
   --usable-height: calc(100dvw - (var(--shell-padding) * 2));
-  --frame-width: min(440px, calc(var(--usable-height) * 0.95));
-  --frame-height: min(calc(var(--frame-width) * 0.64), calc(var(--usable-width) * 0.9));
+  --frame-width: min(calc(var(--screen-long) * 0.9), calc(var(--usable-height) * 0.98));
+  --frame-height: min(calc(var(--screen-short) * 0.92), calc(var(--usable-width) * 0.96));
   --frame-base: min(var(--frame-width), var(--frame-height));
-  --title-size: clamp(13px, calc(var(--frame-base) * 0.058), 25px);
-  --text-size: clamp(10px, calc(var(--frame-base) * 0.043), 17px);
-  --button-vpad: clamp(4px, calc(var(--frame-height) * 0.026), 10px);
-  --button-hpad: clamp(8px, calc(var(--frame-width) * 0.045), 18px);
-  --target-size: clamp(120px, calc(var(--frame-height) * 0.62), 250px);
-  --dot-size: clamp(9px, calc(var(--frame-base) * 0.042), 16px);
-  --card-padding: clamp(9px, calc(var(--frame-base) * 0.046), 18px);
-  --card-gap: clamp(4px, calc(var(--frame-base) * 0.02), 11px);
+  --title-size: max(14px, calc(var(--screen-short) * 0.047));
+  --text-size: max(11px, calc(var(--screen-short) * 0.033));
+  --button-vpad: calc(var(--screen-short) * 0.014);
+  --button-hpad: calc(var(--screen-short) * 0.028);
+  --target-size: min(calc(var(--screen-short) * 0.7), calc(var(--frame-height) * 0.58));
+  --dot-size: max(9px, calc(var(--screen-short) * 0.038));
+  --card-padding: calc(var(--screen-short) * 0.03);
+  --card-gap: calc(var(--screen-short) * 0.012);
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -65,7 +67,7 @@ body,
   height: var(--frame-height);
   overflow: hidden;
   background: #fff;
-  border-radius: 12px;
+  border-radius: calc(var(--screen-short) * 0.03);
   padding: var(--card-padding);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
   display: flex;
@@ -94,14 +96,14 @@ label {
 }
 
 .label {
-  margin-top: clamp(2px, calc(var(--frame-base) * 0.01), 8px);
+  margin-top: calc(var(--screen-short) * 0.01);
   display: block;
   font-weight: 600;
 }
 
 .row {
   display: flex;
-  gap: clamp(4px, calc(var(--frame-base) * 0.01), 8px);
+  gap: calc(var(--screen-short) * 0.01);
   flex-wrap: wrap;
   margin: 0;
 }
@@ -109,15 +111,15 @@ label {
 .column {
   display: flex;
   flex-direction: column;
-  gap: clamp(4px, calc(var(--frame-base) * 0.01), 8px);
+  gap: calc(var(--screen-short) * 0.01);
 }
 
 button {
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border-radius: calc(var(--screen-short) * 0.02);
   padding: var(--button-vpad) var(--button-hpad);
   background: #fff;
-  min-height: clamp(34px, calc(var(--frame-height) * 0.17), 52px);
+  min-height: calc(var(--screen-short) * 0.1);
 }
 
 button.active,
@@ -146,13 +148,13 @@ button:disabled {
 }
 
 .big {
-  font-size: clamp(34px, calc(var(--frame-height) * 0.16), 70px);
+  font-size: calc(var(--screen-short) * 0.18);
   text-align: center;
   margin: 0;
 }
 
 .timer {
-  font-size: clamp(13px, calc(var(--frame-base) * 0.036), 20px);
+  font-size: calc(var(--screen-short) * 0.04);
   font-weight: 700;
   margin: 0;
 }
@@ -160,29 +162,26 @@ button:disabled {
 .targetArea {
   margin: 0 auto;
   width: var(--target-size);
-  aspect-ratio: 1;
+  height: var(--target-size);
   position: relative;
-  border-radius: 50%;
-  border: 2px dashed #94a3b8;
   display: grid;
   place-items: center;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .targetCircle {
-  width: 35%;
-  aspect-ratio: 1;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   border: 2px solid #22c55e;
 }
 
 .dot {
   width: var(--dot-size);
-  aspect-ratio: 1;
+  height: var(--dot-size);
   border-radius: 50%;
   background: #111827;
   position: absolute;
-  transform: translate(-50%, -50%);
 }
 
 .lockMessageCard {
@@ -194,5 +193,5 @@ button:disabled {
 
 ul {
   margin: 0;
-  padding-left: clamp(14px, calc(var(--frame-base) * 0.038), 24px);
+  padding-left: calc(var(--screen-short) * 0.04);
 }
