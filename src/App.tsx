@@ -81,6 +81,7 @@ function App() {
         previousRawRef.current &&
         shouldRejectRawJump(latestRaw, previousRawRef.current, RAW_JUMP_REJECT_DEG)
       ) {
+        previousRawRef.current = latestRaw;
         return;
       }
 

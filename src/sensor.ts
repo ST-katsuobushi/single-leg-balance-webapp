@@ -1,8 +1,8 @@
 import type { SensorPoint } from './types';
 
-export const SENSOR_SENSITIVITY_DEG = 24;
-export const SMOOTHING_ALPHA = 0.25;
-export const RAW_JUMP_REJECT_DEG = 22;
+export const SENSOR_SENSITIVITY_DEG = 28;
+export const SMOOTHING_ALPHA = 0.22;
+export const RAW_JUMP_REJECT_DEG = 30;
 export const MAX_TILT_DEG = 65;
 
 export const AXIS_MAPPING = {
@@ -11,8 +11,8 @@ export const AXIS_MAPPING = {
 } as const;
 
 export const AXIS_SIGNS = {
-  x: 1,
-  y: -1,
+  x: -1,
+  y: 1,
 } as const;
 
 export const MAX_RADIUS = 0.96;
@@ -46,10 +46,9 @@ export function shouldRejectRawJump(currentRaw: SensorPoint, previousRaw: Sensor
     return true;
   }
 
-  return (
-    Math.abs(currentRaw.x - previousRaw.x) > maxDeltaDeg ||
-    Math.abs(currentRaw.y - previousRaw.y) > maxDeltaDeg
-  );
+  const deltaX = currentRaw.x - previousRaw.x;
+  const deltaY = currentRaw.y - previousRaw.y;
+  return Math.hypot(deltaX, deltaY) > maxDeltaDeg;
 }
 
 export function smoothPoint(next: SensorPoint, prev: SensorPoint, alpha: number): SensorPoint {
