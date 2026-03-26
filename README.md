@@ -46,14 +46,22 @@ npm run dev
 ## 練習画面の点の挙動
 
 - 軸・感度・安定化は `src/sensor.ts` の定数で調整可能
-  - `AXIS_MAPPING`（現在は `x=beta`, `y=gamma`）
+  - `AXIS_MAPPING`（現在は `x=gamma`, `y=beta`）
   - `AXIS_SIGNS`（必要に応じた符号反転）
   - `SENSOR_SENSITIVITY_DEG`（小さいほど高感度）
+  - `MAX_TILT_DEG`（姿勢角の使用上限。急激な外れ値を抑制）
   - `SMOOTHING_ALPHA`（0〜1、値が小さいほどなめらか）
   - `RAW_JUMP_REJECT_DEG`（急変値を無視するしきい値）
   - `MAX_RADIUS`（点が到達可能な最大半径）
-- 処理は「キャリブレーション差分 → 急変除外 → 平滑化 → 円内制限」の順で行う
+- 処理は「キャリブレーション差分 → 急変除外 → 平滑化（毎回円内制限）」の順で行う
 - 点は常に円内に収まる
+
+## 回転レイアウトの調整ポイント
+
+- 90度回転は `src/styles.css` の `.rotatedShell` / `.rotatedContent` で制御
+- `transform: translate(-50%, -50%) rotate(90deg)` と `transform-origin: center` で中央固定
+- 回転前サイズを `width: 100dvh`, `height: 100dvw` とし、回転後の見た目（横向き）を自然化
+- 白枠サイズは `--frame-width` / `--frame-height` を基準に調整（画面内に収まる設計）
 
 ## ログ保存
 
