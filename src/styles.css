@@ -188,10 +188,12 @@ button:disabled {
 }
 
 .circleTextBandTop {
+  grid-row: 1;
   flex-direction: column;
 }
 
 .circleTextBandBottom {
+  grid-row: 3;
   flex-direction: row;
 }
 
