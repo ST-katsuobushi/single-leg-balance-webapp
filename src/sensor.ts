@@ -1,4 +1,4 @@
-import type { SensorPoint } from './types';
+import type { DisplayTransform, SensorPoint } from './types';
 
 export const EDGE_TILT_DEG = 45;
 export const INPUT_TILT_CLAMP_DEG = 70;
@@ -54,6 +54,52 @@ export function pointFromOrientation(
   };
 
   return limitToCircle(normalized, MAX_RADIUS);
+}
+
+export function applyDisplayTransform(point: SensorPoint, transform: DisplayTransform): SensorPoint {
+  const swapped = transform.swapXY
+    ? { x: point.y, y: point.x }
+    : { x: point.x, y: point.y };
+
+  return {
+    x: transform.invertX ? -swapped.x : swapped.x,
+    y: transform.invertY ? -swapped.y : swapped.y,
+  };
+}
+
+export function inferDisplayTransform(leftTiltDelta: SensorPoint, forwardTiltDelta: SensorPoint): DisplayTransform {
+  const candidates: DisplayTransform[] = [];
+
+  for (const swapXY of [false, true]) {
+    for (const invertX of [false, true]) {
+      for (const invertY of [false, true]) {
+        candidates.push({ swapXY, invertX, invertY });
+      }
+    }
+  }
+
+  let best = candidates[0];
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const candidate of candidates) {
+    const left = applyDisplayTransform(leftTiltDelta, candidate);
+    const forward = applyDisplayTransform(forwardTiltDelta, candidate);
+
+    let score = 0;
+    // 左傾きは「左へ」= xが負、かつ横方向が優位。
+    if (left.x < 0) score += 2;
+    score += Math.abs(left.x) - Math.abs(left.y);
+    // 前傾きは「上へ」= yが負、かつ縦方向が優位。
+    if (forward.y < 0) score += 2;
+    score += Math.abs(forward.y) - Math.abs(forward.x);
+
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+
+  return best;
 }
 
 export function shouldRejectRawJump(currentRaw: SensorPoint, previousRaw: SensorPoint, maxDeltaDeg: number) {

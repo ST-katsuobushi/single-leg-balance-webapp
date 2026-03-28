@@ -6,6 +6,11 @@ const LOG_KEY = 'balance_app_logs_v1';
 export const defaultSettings: Settings = {
   leg: 'left',
   durationSec: 30,
+  displayTransform: {
+    swapXY: false,
+    invertX: false,
+    invertY: false,
+  },
 };
 
 export function loadSettings(): Settings {
@@ -14,13 +19,20 @@ export function loadSettings(): Settings {
     if (!raw) return defaultSettings;
     const parsed = JSON.parse(raw) as Partial<Settings>;
 
-    if (
-      (parsed.leg === 'left' || parsed.leg === 'right') &&
-      (parsed.durationSec === 20 || parsed.durationSec === 30 || parsed.durationSec === 60)
-    ) {
+    const parsedTransform = parsed.displayTransform;
+    const hasValidTransform =
+      !!parsedTransform &&
+      typeof parsedTransform === 'object' &&
+      typeof parsedTransform.swapXY === 'boolean' &&
+      typeof parsedTransform.invertX === 'boolean' &&
+      typeof parsedTransform.invertY === 'boolean';
+
+    if ((parsed.leg === 'left' || parsed.leg === 'right') &&
+      (parsed.durationSec === 20 || parsed.durationSec === 30 || parsed.durationSec === 60)) {
       return {
         leg: parsed.leg,
         durationSec: parsed.durationSec,
+        displayTransform: hasValidTransform ? parsedTransform : defaultSettings.displayTransform,
       };
     }
 

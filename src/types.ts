@@ -5,13 +5,21 @@ export type DurationOption = 20 | 30 | 60;
 export type Screen =
   | 'start'
   | 'prepare'
+  | 'direction_calibration'
   | 'countdown'
   | 'training'
   | 'finished';
 
+export type DisplayTransform = {
+  swapXY: boolean;
+  invertX: boolean;
+  invertY: boolean;
+};
+
 export type Settings = {
   leg: Leg;
   durationSec: DurationOption;
+  displayTransform: DisplayTransform;
 };
 
 export type SensorPoint = {
