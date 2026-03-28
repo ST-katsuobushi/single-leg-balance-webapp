@@ -37,11 +37,10 @@ body,
   --button-vpad: calc(var(--screen-short) * 0.014);
   --button-hpad: calc(var(--screen-short) * 0.028);
   --target-size: calc(var(--screen-short) * 0.7);
+  --text-band-max: calc(var(--screen-short) * 0.1);
   --dot-size: max(9px, calc(var(--screen-short) * 0.038));
   --card-padding: calc(var(--screen-short) * 0.03);
   --card-gap: calc(var(--screen-short) * 0.012);
-  --training-top-height: 10%;
-  --training-bottom-height: 10%;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -161,49 +160,55 @@ button:disabled {
   margin: 0;
 }
 
-
-.trainingLayout {
+.circleScreenLayout {
   height: 100%;
+  position: relative;
+  min-height: 0;
   display: grid;
-  grid-template-rows: var(--training-top-height) 1fr var(--training-bottom-height);
-  align-items: stretch;
-  min-height: 0;
-  gap: 0;
+  grid-template-rows: var(--text-band-max) 1fr var(--text-band-max);
 }
 
-.trainingTop {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: calc(var(--screen-short) * 0.004);
-  text-align: center;
-}
-
-.trainingTop h2 {
-  font-size: max(13px, calc(var(--screen-short) * 0.036));
-  line-height: 1.15;
-}
-
-.trainingMiddle {
-  min-height: 0;
+.circleCenterLayer {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
-  padding: calc(var(--screen-short) * 0.006) 0;
 }
 
-.trainingBottom {
+.circleTextBand {
+  z-index: 1;
   min-height: 0;
+  max-height: var(--text-band-max);
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: calc(var(--screen-short) * 0.008);
+  text-align: center;
+  overflow: hidden;
 }
 
-.trainingStop {
-  min-height: calc(var(--screen-short) * 0.078);
-  padding: calc(var(--screen-short) * 0.009) calc(var(--screen-short) * 0.04);
-  font-size: max(12px, calc(var(--screen-short) * 0.032));
+.circleTextBandTop {
+  flex-direction: column;
+}
+
+.circleTextBandBottom {
+  flex-direction: row;
+}
+
+.circleActionBand {
+  flex-wrap: wrap;
+}
+
+.trainingTitle {
+  font-size: max(13px, calc(var(--screen-short) * 0.036));
+  line-height: 1.1;
+  margin: 0;
+}
+
+.circleBandButton {
+  min-height: auto;
+  padding: calc(var(--screen-short) * 0.006) calc(var(--screen-short) * 0.022);
+  font-size: max(11px, calc(var(--screen-short) * 0.028));
 }
 
 .targetArea {

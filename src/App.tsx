@@ -406,33 +406,41 @@ function App() {
                     </>
                   )}
                   {directionCalibStep === 'confirm' && (
-                    <>
-                      <p className="hint">確認: 左に傾けるとドットが左、前に傾けると上に動くか見てください。</p>
-                      <div ref={targetAreaRef} className="targetArea" aria-label="direction check preview">
-                        <div className="targetCircle" />
-                        <div
-                          className="dot"
-                          style={{
-                            left: '50%',
-                            top: '50%',
-                            transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
-                          }}
-                        />
+                    <div className="circleScreenLayout">
+                      <header className="circleTextBand circleTextBandTop">
+                        <p className="hint">左で左、前で上に動くか確認</p>
+                      </header>
+
+                      <div className="circleCenterLayer">
+                        <div ref={targetAreaRef} className="targetArea" aria-label="direction check preview">
+                          <div className="targetCircle" />
+                          <div
+                            className="dot"
+                            style={{
+                              left: '50%',
+                              top: '50%',
+                              transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
+                            }}
+                          />
+                        </div>
                       </div>
-                      <button className="primary" onClick={startCountdown}>
-                        問題ないので開始
-                      </button>
-                      <button
-                        className="secondary"
-                        onClick={() => {
-                          setDirectionCalibStep('left');
-                          setDirectionCalibError('');
-                          setLeftTiltSample(null);
-                        }}
-                      >
-                        方向校正をやり直す
-                      </button>
-                    </>
+
+                      <footer className="circleTextBand circleTextBandBottom circleActionBand">
+                        <button className="primary circleBandButton" onClick={startCountdown}>
+                          開始
+                        </button>
+                        <button
+                          className="secondary circleBandButton"
+                          onClick={() => {
+                            setDirectionCalibStep('left');
+                            setDirectionCalibError('');
+                            setLeftTiltSample(null);
+                          }}
+                        >
+                          再校正
+                        </button>
+                      </footer>
+                    </div>
                   )}
                   {directionCalibError && <p className="error">{directionCalibError}</p>}
                 </>
@@ -446,13 +454,13 @@ function App() {
               )}
 
               {screen === 'training' && (
-                <div className="trainingLayout">
-                  <header className="trainingTop">
-                    <h2>練習中（{settings.leg === 'left' ? '左脚' : '右脚'}）</h2>
+                <div className="circleScreenLayout">
+                  <header className="circleTextBand circleTextBandTop">
+                    <h2 className="trainingTitle">{settings.leg === 'left' ? '左脚' : '右脚'}</h2>
                     <p className="timer">残り: {remainingSec} 秒</p>
                   </header>
 
-                  <div className="trainingMiddle">
+                  <div className="circleCenterLayer">
                     <div ref={targetAreaRef} className="targetArea" aria-label="balance target area">
                       <div className="targetCircle" />
                       <div
@@ -466,8 +474,8 @@ function App() {
                     </div>
                   </div>
 
-                  <footer className="trainingBottom">
-                    <button className="danger trainingStop" onClick={() => finishSession(false)}>
+                  <footer className="circleTextBand circleTextBandBottom">
+                    <button className="danger circleBandButton" onClick={() => finishSession(false)}>
                       停止
                     </button>
                   </footer>
