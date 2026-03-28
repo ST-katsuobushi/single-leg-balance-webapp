@@ -4,16 +4,26 @@ import {
   RAW_JUMP_REJECT_DEG,
   SMOOTHING_ALPHA_X,
   SMOOTHING_ALPHA_Y,
+  applyDisplayTransform,
   distanceFromCenter,
+  inferDisplayTransform,
   mapOrientation,
   pointFromOrientation,
   shouldRejectRawJump,
   smoothPoint,
 } from './sensor';
-import type { DurationOption, Leg, Screen, SensorPoint, SessionLog, Settings } from './types';
+import type {
+  DurationOption,
+  Leg,
+  Screen,
+  SensorPoint,
+  SessionLog,
+  Settings,
+} from './types';
 
 const DURATION_OPTIONS: DurationOption[] = [20, 30, 60];
 const TARGET_RADIUS = 0.4;
+const DIRECTION_CALIB_MIN_DELTA_DEG = 3;
 
 const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
 
@@ -30,6 +40,9 @@ function App() {
   const [rawOrientation, setRawOrientation] = useState<SensorPoint>({ x: 0, y: 0 });
   const [calibration, setCalibration] = useState<SensorPoint | null>(null);
   const [permissionError, setPermissionError] = useState<string>('');
+  const [directionCalibStep, setDirectionCalibStep] = useState<'left' | 'forward' | 'confirm'>('left');
+  const [directionCalibError, setDirectionCalibError] = useState<string>('');
+  const [leftTiltSample, setLeftTiltSample] = useState<SensorPoint | null>(null);
   const [isPortraitViewport, setIsPortraitViewport] = useState(() =>
     window.matchMedia('(orientation: portrait)').matches,
   );
@@ -63,6 +76,9 @@ function App() {
       setScreen('start');
       setCalibration(null);
       setPosition({ x: 0, y: 0 });
+      setDirectionCalibStep('left');
+      setDirectionCalibError('');
+      setLeftTiltSample(null);
       previousRawRef.current = null;
       filteredPointRef.current = { x: 0, y: 0 };
       setPermissionError('');
@@ -116,12 +132,13 @@ function App() {
         SMOOTHING_ALPHA_X,
         SMOOTHING_ALPHA_Y,
       );
+      const displayPoint = applyDisplayTransform(smoothedPoint, settings.displayTransform);
       filteredPointRef.current = smoothedPoint;
       previousRawRef.current = latestRaw;
-      setPosition(smoothedPoint);
+      setPosition(displayPoint);
 
       if (screen === 'training') {
-        const d = distanceFromCenter(smoothedPoint);
+        const d = distanceFromCenter(displayPoint);
         swayValuesRef.current.push(d);
         totalCountRef.current += 1;
         if (d <= TARGET_RADIUS) {
@@ -132,7 +149,7 @@ function App() {
 
     window.addEventListener('deviceorientation', handleOrientation);
     return () => window.removeEventListener('deviceorientation', handleOrientation);
-  }, [calibration, screen]);
+  }, [calibration, screen, settings.displayTransform]);
 
   useEffect(() => {
     if (screen !== 'countdown') return;
@@ -191,6 +208,9 @@ function App() {
       await requestMotionPermissionIfNeeded();
       setCalibration(null);
       setPosition({ x: 0, y: 0 });
+      setDirectionCalibStep('left');
+      setDirectionCalibError('');
+      setLeftTiltSample(null);
       previousRawRef.current = null;
       filteredPointRef.current = { x: 0, y: 0 };
       setScreen('prepare');
@@ -204,6 +224,10 @@ function App() {
     previousRawRef.current = rawOrientation;
     filteredPointRef.current = { x: 0, y: 0 };
     setPosition({ x: 0, y: 0 });
+    setDirectionCalibStep('left');
+    setDirectionCalibError('');
+    setLeftTiltSample(null);
+    setScreen('direction_calibration');
   }
 
   function startCountdown() {
@@ -247,6 +271,9 @@ function App() {
   function goHome() {
     setCalibration(null);
     setPosition({ x: 0, y: 0 });
+    setDirectionCalibStep('left');
+    setDirectionCalibError('');
+    setLeftTiltSample(null);
     previousRawRef.current = null;
     filteredPointRef.current = { x: 0, y: 0 };
     setRemainingSec(settings.durationSec);
@@ -256,6 +283,37 @@ function App() {
   function toggleLeg() {
     const nextLeg: Leg = settings.leg === 'left' ? 'right' : 'left';
     setSettings((prev) => ({ ...prev, leg: nextLeg }));
+  }
+
+  function captureDirectionSample() {
+    if (!calibration) {
+      setDirectionCalibError('先にゼロ校正を行ってください。');
+      return;
+    }
+
+    const sample = {
+      x: rawOrientation.x - calibration.x,
+      y: rawOrientation.y - calibration.y,
+    };
+
+    if (Math.hypot(sample.x, sample.y) < DIRECTION_CALIB_MIN_DELTA_DEG) {
+      setDirectionCalibError('傾き量が小さいです。もう少しだけ傾けてください。');
+      return;
+    }
+
+    if (directionCalibStep === 'left') {
+      setLeftTiltSample(sample);
+      setDirectionCalibStep('forward');
+      setDirectionCalibError('');
+      return;
+    }
+
+    if (directionCalibStep === 'forward' && leftTiltSample) {
+      const inferred = inferDisplayTransform(leftTiltSample, sample);
+      setSettings((prev) => ({ ...prev, displayTransform: inferred }));
+      setDirectionCalibStep('confirm');
+      setDirectionCalibError('');
+    }
   }
 
   return (
@@ -322,9 +380,61 @@ function App() {
                   <button className="primary" onClick={calibrate}>
                     この姿勢で校正
                   </button>
-                  <button className="secondary" disabled={!calibration} onClick={startCountdown}>
-                    次へ
-                  </button>
+                </>
+              )}
+
+              {screen === 'direction_calibration' && (
+                <>
+                  <h2>方向校正</h2>
+                  <p className="hint">
+                    ゼロ校正後に、表示方向だけを端末ごとに合わせます（センサー処理の核は変更しません）。
+                  </p>
+                  {directionCalibStep === 'left' && (
+                    <>
+                      <p className="hint">1/2: 端末を「左に少し」傾けて、記録を押してください。</p>
+                      <button className="primary" onClick={captureDirectionSample}>
+                        左傾きの記録
+                      </button>
+                    </>
+                  )}
+                  {directionCalibStep === 'forward' && (
+                    <>
+                      <p className="hint">2/2: 次に「前に少し」傾けて、記録を押してください。</p>
+                      <button className="primary" onClick={captureDirectionSample}>
+                        前傾きの記録
+                      </button>
+                    </>
+                  )}
+                  {directionCalibStep === 'confirm' && (
+                    <>
+                      <p className="hint">確認: 左に傾けるとドットが左、前に傾けると上に動くか見てください。</p>
+                      <div ref={targetAreaRef} className="targetArea" aria-label="direction check preview">
+                        <div className="targetCircle" />
+                        <div
+                          className="dot"
+                          style={{
+                            left: '50%',
+                            top: '50%',
+                            transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
+                          }}
+                        />
+                      </div>
+                      <button className="primary" onClick={startCountdown}>
+                        問題ないので開始
+                      </button>
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          setDirectionCalibStep('left');
+                          setDirectionCalibError('');
+                          setLeftTiltSample(null);
+                        }}
+                      >
+                        方向校正をやり直す
+                      </button>
+                    </>
+                  )}
+                  {directionCalibError && <p className="error">{directionCalibError}</p>}
                 </>
               )}
 
