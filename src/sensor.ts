@@ -45,6 +45,7 @@ export const MAX_RADIUS = 1;
 export type CursorComputeInput = {
   orientationEvent: DeviceOrientationEvent;
   calibration: SensorPoint;
+  axisTransform: DisplayTransform;
   previousCursor: SensorPoint;
   previousAccFiltered: SensorPoint;
   accelBodyFrame: SensorPoint | null;
@@ -167,7 +168,8 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
 }
 
 export function composeCursorPoint(input: CursorComputeInput): CursorComputeOutput {
-  const tiltOnly = pointFromOrientation(input.orientationEvent, input.calibration);
+  const tiltBodyFrame = pointFromOrientation(input.orientationEvent, input.calibration);
+  const tiltOnly = applyDisplayTransform(tiltBodyFrame, input.axisTransform);
 
   const accFiltered = filterAcceleration(input.accelBodyFrame, input.previousAccFiltered, CURSOR_PARAMS.accFilterRho);
   const hasAcceleration = input.accelBodyFrame !== null;
@@ -176,12 +178,13 @@ export function composeCursorPoint(input: CursorComputeInput): CursorComputeOutp
     x: normalizeAccelerationAxis(accFiltered.x),
     y: normalizeAccelerationAxis(accFiltered.y),
   };
+  const accMapped = applyDisplayTransform(accNormalized, input.axisTransform);
 
   const rawComposite = limitToCircle(
     hasAcceleration
       ? {
-          x: CURSOR_PARAMS.tiltWeight * tiltOnly.x + CURSOR_PARAMS.accelWeight * accNormalized.x,
-          y: CURSOR_PARAMS.tiltWeight * tiltOnly.y + CURSOR_PARAMS.accelWeight * accNormalized.y,
+          x: CURSOR_PARAMS.tiltWeight * tiltOnly.x + CURSOR_PARAMS.accelWeight * accMapped.x,
+          y: CURSOR_PARAMS.tiltWeight * tiltOnly.y + CURSOR_PARAMS.accelWeight * accMapped.y,
         }
       : tiltOnly,
     MAX_RADIUS,
