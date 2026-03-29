@@ -1,9 +1,7 @@
-import type { DisplayTransform, SensorPoint } from './types';
+import type { AccelerationSample, DisplayTransform, SensorPoint } from './types';
 
 export const EDGE_TILT_DEG = 45;
 export const INPUT_TILT_CLAMP_DEG = 70;
-export const SMOOTHING_ALPHA_X = 0.34;
-export const SMOOTHING_ALPHA_Y = 0.2;
 export const RAW_JUMP_REJECT_DEG = 28;
 export const AXIS_STEP_LIMIT_X = 0.2;
 export const AXIS_STEP_LIMIT_Y = 0.08;
@@ -11,6 +9,20 @@ export const AXIS_STEP_LIMIT_Y_FORWARD = 0.06;
 export const AXIS_STEP_LIMIT_Y_BACKWARD = 0.05;
 export const AXIS_DEADZONE_DEG_X = 1.2;
 export const AXIS_DEADZONE_DEG_Y = 2.2;
+export const CURSOR_PARAMS = {
+  gammaMax: EDGE_TILT_DEG,
+  betaMax: EDGE_TILT_DEG,
+  // acceleration の一次 IIR フィルタ係数（大きいほどなめらか）
+  accFilterRho: 0.8,
+  // m/s^2 の微小ノイズ抑制
+  accDead: 0.03,
+  // 正規化基準加速度
+  aRef: 0.45,
+  tiltWeight: 0.85,
+  accelWeight: 0.15,
+  // 最終表示の平滑化係数
+  cursorLambda: 0.75,
+} as const;
 
 export const AXIS_MAPPING = {
   x: 'beta',
@@ -22,7 +34,30 @@ export const AXIS_SIGNS = {
   y: 1,
 } as const;
 
+export const ACCEL_BODY_MAPPING = {
+  // bodyX: 左(-) / 右(+), bodyY: 前(-) / 後(+)
+  x: { sourceAxis: 'x', sign: 1 },
+  y: { sourceAxis: 'y', sign: 1 },
+} as const;
+
 export const MAX_RADIUS = 1;
+
+export type CursorComputeInput = {
+  orientationEvent: DeviceOrientationEvent;
+  calibration: SensorPoint;
+  previousCursor: SensorPoint;
+  previousAccFiltered: SensorPoint;
+  accelBodyFrame: SensorPoint | null;
+};
+
+export type CursorComputeOutput = {
+  cursor: SensorPoint;
+  rawComposite: SensorPoint;
+  tiltOnly: SensorPoint;
+  accFiltered: SensorPoint;
+  accNormalized: SensorPoint;
+  mode: 'tilt_only' | 'tilt_plus_accel';
+};
 
 export function mapOrientation(event: DeviceOrientationEvent): SensorPoint {
   const beta = normalizeAngle(event.beta ?? 0);
@@ -131,8 +166,75 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
   );
 }
 
+export function composeCursorPoint(input: CursorComputeInput): CursorComputeOutput {
+  const tiltOnly = pointFromOrientation(input.orientationEvent, input.calibration);
+
+  const accFiltered = filterAcceleration(input.accelBodyFrame, input.previousAccFiltered, CURSOR_PARAMS.accFilterRho);
+  const hasAcceleration = input.accelBodyFrame !== null;
+
+  const accNormalized = {
+    x: normalizeAccelerationAxis(accFiltered.x),
+    y: normalizeAccelerationAxis(accFiltered.y),
+  };
+
+  const rawComposite = limitToCircle(
+    hasAcceleration
+      ? {
+          x: CURSOR_PARAMS.tiltWeight * tiltOnly.x + CURSOR_PARAMS.accelWeight * accNormalized.x,
+          y: CURSOR_PARAMS.tiltWeight * tiltOnly.y + CURSOR_PARAMS.accelWeight * accNormalized.y,
+        }
+      : tiltOnly,
+    MAX_RADIUS,
+  );
+
+  const cursor = smoothPoint(rawComposite, input.previousCursor, 1 - CURSOR_PARAMS.cursorLambda, 1 - CURSOR_PARAMS.cursorLambda);
+
+  return {
+    cursor,
+    rawComposite,
+    tiltOnly,
+    accFiltered,
+    accNormalized,
+    mode: hasAcceleration ? 'tilt_plus_accel' : 'tilt_only',
+  };
+}
+
+export function mapAccelerationToBodyFrame(sample: AccelerationSample): SensorPoint | null {
+  if (sample.x === null || sample.y === null) {
+    return null;
+  }
+
+  const axisValue = {
+    x: sample.x,
+    y: sample.y,
+    z: sample.z ?? 0,
+  };
+
+  return {
+    x: axisValue[ACCEL_BODY_MAPPING.x.sourceAxis] * ACCEL_BODY_MAPPING.x.sign,
+    y: axisValue[ACCEL_BODY_MAPPING.y.sourceAxis] * ACCEL_BODY_MAPPING.y.sign,
+  };
+}
+
 function normalizeToDisplayRange(valueDeg: number): number {
   return clamp(valueDeg / EDGE_TILT_DEG, -1, 1);
+}
+
+function filterAcceleration(current: SensorPoint | null, prev: SensorPoint, rho: number): SensorPoint {
+  if (!current) {
+    return { ...prev };
+  }
+
+  const r = clamp(rho, 0, 1);
+  return {
+    x: r * prev.x + (1 - r) * current.x,
+    y: r * prev.y + (1 - r) * current.y,
+  };
+}
+
+function normalizeAccelerationAxis(value: number): number {
+  const withDeadzone = Math.abs(value) < CURSOR_PARAMS.accDead ? 0 : value;
+  return clamp(withDeadzone / CURSOR_PARAMS.aRef, -1, 1);
 }
 
 function applyDeadzone(valueDeg: number, deadzoneDeg: number): number {
