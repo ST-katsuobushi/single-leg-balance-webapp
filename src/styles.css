@@ -254,9 +254,35 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.sensorCheckLayout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(140px, 0.9fr) 1.6fr;
+  gap: calc(var(--screen-short) * 0.02);
+  align-items: stretch;
+}
+
+.sensorCheckPreviewColumn,
+.sensorCheckInfoColumn {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--screen-short) * 0.012);
+}
+
+.sensorCheckPreviewColumn {
+  justify-content: center;
+  align-items: center;
+}
+
+.sensorCheckInfoColumn {
+  overflow: hidden;
+}
+
 .sensorPreview {
-  width: min(130px, calc(var(--screen-short) * 0.42));
-  height: min(130px, calc(var(--screen-short) * 0.42));
+  width: min(120px, calc(var(--screen-short) * 0.34));
+  height: min(120px, calc(var(--screen-short) * 0.34));
   position: relative;
   display: grid;
   place-items: center;
@@ -268,6 +294,71 @@ button:disabled {
   border-radius: 50%;
   border: 2px solid #60a5fa;
   background: #eff6ff;
+}
+
+.sensorJudgeCard {
+  border-radius: calc(var(--screen-short) * 0.02);
+  padding: calc(var(--screen-short) * 0.015) calc(var(--screen-short) * 0.02);
+  border: 2px solid;
+}
+
+.sensorJudgeCard.ok {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.sensorJudgeCard.partial {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.sensorJudgeCard.ng {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.sensorJudgeLabel,
+.sensorJudgeDetail {
+  margin: 0;
+}
+
+.sensorJudgeLabel {
+  font-size: max(10px, calc(var(--screen-short) * 0.024));
+  color: #475569;
+}
+
+.sensorJudgeTitle {
+  margin: calc(var(--screen-short) * 0.004) 0;
+  font-size: max(18px, calc(var(--screen-short) * 0.052));
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.sensorStatusGrid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: calc(var(--screen-short) * 0.007) calc(var(--screen-short) * 0.016);
+}
+
+.sensorStatusGrid p {
+  margin: 0;
+}
+
+.sensorStatusGrid p:nth-child(2n) {
+  font-weight: 700;
+}
+
+.sensorCompactLine {
+  margin-top: auto;
+  font-size: max(10px, calc(var(--screen-short) * 0.026));
+}
+
+.sensorCheckActions {
+  justify-content: flex-end;
+}
+
+.sensorCheckActions button {
+  flex: 0 0 auto;
 }
 
 .lockMessageCard {
