@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { appendSessionLog, loadSettings, saveSettings } from './storage';
 import {
   RAW_JUMP_REJECT_DEG,
-  applyDisplayTransform,
   composeCursorPoint,
   distanceFromCenter,
   inferDisplayTransform,
@@ -171,18 +170,18 @@ function App() {
       const composed = composeCursorPoint({
         orientationEvent: event,
         calibration: activeCalibration,
+        axisTransform: settings.displayTransform,
         previousCursor: filteredPointRef.current,
         previousAccFiltered: filteredAccRef.current,
         accelBodyFrame,
       });
-      const displayPoint = applyDisplayTransform(composed.cursor, settings.displayTransform);
       filteredPointRef.current = composed.cursor;
       filteredAccRef.current = composed.accFiltered;
       previousRawRef.current = latestRaw;
-      setPosition(displayPoint);
+      setPosition(composed.cursor);
 
       if (screen === 'training') {
-        const d = distanceFromCenter(displayPoint);
+        const d = distanceFromCenter(composed.cursor);
         swayValuesRef.current.push(d);
         totalCountRef.current += 1;
         if (d <= TARGET_RADIUS) {
