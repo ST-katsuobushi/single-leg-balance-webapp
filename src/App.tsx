@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { appendSessionLog, loadSettings, saveSettings } from './storage';
 import {
+  CURSOR_PARAMS,
   RAW_JUMP_REJECT_DEG,
-  SMOOTHING_ALPHA_X,
-  SMOOTHING_ALPHA_Y,
   applyDisplayTransform,
+  composeCursorPoint,
   distanceFromCenter,
   inferDisplayTransform,
+  mapAccelerationToBodyFrame,
   mapOrientation,
-  pointFromOrientation,
   shouldRejectRawJump,
-  smoothPoint,
 } from './sensor';
 import type {
+  AccelerationSample,
   DurationOption,
   Leg,
   Screen,
@@ -24,6 +24,9 @@ import type {
 const DURATION_OPTIONS: DurationOption[] = [20, 30, 60];
 const TARGET_RADIUS = 0.4;
 const DIRECTION_CALIB_MIN_DELTA_DEG = 3;
+const ACC_VALID_WINDOW = 12;
+const ACC_VALID_MIN_COUNT = 8;
+const SENSOR_DEBUG = true;
 
 const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
 
@@ -38,6 +41,7 @@ function App() {
   const [remainingSec, setRemainingSec] = useState<number>(settings.durationSec);
   const [position, setPosition] = useState<SensorPoint>({ x: 0, y: 0 });
   const [rawOrientation, setRawOrientation] = useState<SensorPoint>({ x: 0, y: 0 });
+  const [rawAcceleration, setRawAcceleration] = useState<AccelerationSample>({ x: null, y: null, z: null });
   const [calibration, setCalibration] = useState<SensorPoint | null>(null);
   const [permissionError, setPermissionError] = useState<string>('');
   const [directionCalibStep, setDirectionCalibStep] = useState<'left' | 'forward' | 'confirm'>('left');
@@ -53,6 +57,14 @@ function App() {
   const totalCountRef = useRef(0);
   const previousRawRef = useRef<SensorPoint | null>(null);
   const filteredPointRef = useRef<SensorPoint>({ x: 0, y: 0 });
+  const filteredAccRef = useRef<SensorPoint>({ x: 0, y: 0 });
+  const [filteredAcceleration, setFilteredAcceleration] = useState<SensorPoint>({ x: 0, y: 0 });
+  const [sensorMode, setSensorMode] = useState<'tilt_only' | 'tilt_plus_accel'>('tilt_only');
+  const [hasOrientationEvent, setHasOrientationEvent] = useState(false);
+  const [hasMotionEvent, setHasMotionEvent] = useState(false);
+  const [accelerationSupported, setAccelerationSupported] = useState(false);
+  const sensorCheckCalibrationRef = useRef<SensorPoint | null>(null);
+  const accValidWindowRef = useRef<boolean[]>([]);
   const targetAreaRef = useRef<HTMLDivElement | null>(null);
   const [targetRadiusPx, setTargetRadiusPx] = useState(0);
 
@@ -81,6 +93,13 @@ function App() {
       setLeftTiltSample(null);
       previousRawRef.current = null;
       filteredPointRef.current = { x: 0, y: 0 };
+      filteredAccRef.current = { x: 0, y: 0 };
+      setFilteredAcceleration({ x: 0, y: 0 });
+      setRawAcceleration({ x: null, y: null, z: null });
+      setSensorMode('tilt_only');
+      setAccelerationSupported(false);
+      sensorCheckCalibrationRef.current = null;
+      accValidWindowRef.current = [];
       setPermissionError('');
     }
   }, [isPortraitViewport, screen]);
@@ -111,11 +130,40 @@ function App() {
   }, [screen]);
 
   useEffect(() => {
+    const handleMotion = (event: DeviceMotionEvent) => {
+      setHasMotionEvent(true);
+      const acceleration = event.acceleration;
+      const next = {
+        x: acceleration?.x ?? null,
+        y: acceleration?.y ?? null,
+        z: acceleration?.z ?? null,
+      };
+      setRawAcceleration(next);
+
+      const hasAcc = next.x !== null && next.y !== null;
+      const windowBuffer = [...accValidWindowRef.current, hasAcc].slice(-ACC_VALID_WINDOW);
+      accValidWindowRef.current = windowBuffer;
+      const validCount = windowBuffer.filter(Boolean).length;
+      setAccelerationSupported(validCount >= ACC_VALID_MIN_COUNT);
+    };
+
+    window.addEventListener('devicemotion', handleMotion);
+    return () => window.removeEventListener('devicemotion', handleMotion);
+  }, []);
+
+  useEffect(() => {
     const handleOrientation = (event: DeviceOrientationEvent) => {
+      setHasOrientationEvent(true);
       const latestRaw = mapOrientation(event);
       setRawOrientation(latestRaw);
 
-      if (!calibration) return;
+      const activeCalibration = calibration ?? (screen === 'sensor_check' ? sensorCheckCalibrationRef.current : null);
+      if (!activeCalibration) {
+        if (screen === 'sensor_check') {
+          sensorCheckCalibrationRef.current = latestRaw;
+        }
+        return;
+      }
 
       if (
         previousRawRef.current &&
@@ -125,15 +173,22 @@ function App() {
         return;
       }
 
-      const instantPoint = pointFromOrientation(event, calibration);
-      const smoothedPoint = smoothPoint(
-        instantPoint,
-        filteredPointRef.current,
-        SMOOTHING_ALPHA_X,
-        SMOOTHING_ALPHA_Y,
-      );
-      const displayPoint = applyDisplayTransform(smoothedPoint, settings.displayTransform);
-      filteredPointRef.current = smoothedPoint;
+      const accelBodyFrame = accelerationSupported
+        ? mapAccelerationToBodyFrame(rawAcceleration)
+        : null;
+
+      const composed = composeCursorPoint({
+        orientationEvent: event,
+        calibration: activeCalibration,
+        previousCursor: filteredPointRef.current,
+        previousAccFiltered: filteredAccRef.current,
+        accelBodyFrame,
+      });
+      const displayPoint = applyDisplayTransform(composed.cursor, settings.displayTransform);
+      filteredPointRef.current = composed.cursor;
+      filteredAccRef.current = composed.accFiltered;
+      setFilteredAcceleration(composed.accFiltered);
+      setSensorMode(composed.mode);
       previousRawRef.current = latestRaw;
       setPosition(displayPoint);
 
@@ -149,7 +204,7 @@ function App() {
 
     window.addEventListener('deviceorientation', handleOrientation);
     return () => window.removeEventListener('deviceorientation', handleOrientation);
-  }, [calibration, screen, settings.displayTransform]);
+  }, [calibration, rawAcceleration.x, rawAcceleration.y, screen, settings.displayTransform]);
 
   useEffect(() => {
     if (screen !== 'countdown') return;
@@ -195,6 +250,14 @@ function App() {
         throw new Error('センサー利用が許可されませんでした。');
       }
     }
+
+    const anyMotion = DeviceMotionEvent as unknown as DeviceOrientationEventWithPermission;
+    if (typeof anyMotion.requestPermission === 'function') {
+      const result = await anyMotion.requestPermission();
+      if (result !== 'granted') {
+        throw new Error('モーションセンサー利用が許可されませんでした。');
+      }
+    }
   }
 
   async function goToPrepare() {
@@ -213,6 +276,13 @@ function App() {
       setLeftTiltSample(null);
       previousRawRef.current = null;
       filteredPointRef.current = { x: 0, y: 0 };
+      filteredAccRef.current = { x: 0, y: 0 };
+      setFilteredAcceleration({ x: 0, y: 0 });
+      setRawAcceleration({ x: null, y: null, z: null });
+      setSensorMode('tilt_only');
+      setAccelerationSupported(false);
+      sensorCheckCalibrationRef.current = null;
+      accValidWindowRef.current = [];
       setScreen('prepare');
     } catch (error) {
       setPermissionError(error instanceof Error ? error.message : '不明なエラーが発生しました。');
@@ -223,6 +293,7 @@ function App() {
     setCalibration({ ...rawOrientation });
     previousRawRef.current = rawOrientation;
     filteredPointRef.current = { x: 0, y: 0 };
+    filteredAccRef.current = { x: 0, y: 0 };
     setPosition({ x: 0, y: 0 });
     setDirectionCalibStep('left');
     setDirectionCalibError('');
@@ -276,6 +347,10 @@ function App() {
     setLeftTiltSample(null);
     previousRawRef.current = null;
     filteredPointRef.current = { x: 0, y: 0 };
+    filteredAccRef.current = { x: 0, y: 0 };
+    sensorCheckCalibrationRef.current = null;
+    accValidWindowRef.current = [];
+    setAccelerationSupported(false);
     setRemainingSec(settings.durationSec);
     setScreen('start');
   }
@@ -362,9 +437,85 @@ function App() {
                   </div>
 
                   {permissionError && <p className="error">{permissionError}</p>}
+                  <button
+                    onClick={async () => {
+                      try {
+                        await requestMotionPermissionIfNeeded();
+                        setPermissionError('');
+                        sensorCheckCalibrationRef.current = null;
+                        setScreen('sensor_check');
+                      } catch (error) {
+                        setPermissionError(error instanceof Error ? error.message : '不明なエラーが発生しました。');
+                      }
+                    }}
+                  >
+                    センサ確認モード
+                  </button>
                   <button className="primary" onClick={goToPrepare}>
                     開始
                   </button>
+                </>
+              )}
+
+              {screen === 'sensor_check' && (
+                <>
+                  <h2>センサ確認モード</h2>
+                  <p className="hint">検査者が符号・軸・有効性を確認してください。</p>
+                  <ul>
+                    <li>DeviceOrientationEvent: {hasOrientationEvent ? '取得中' : '未取得'}</li>
+                    <li>DeviceMotionEvent: {hasMotionEvent ? '取得中' : '未取得'}</li>
+                    <li>acceleration有効: {accelerationSupported ? '有効' : '無効/未対応'}</li>
+                    <li>現在モード: {sensorMode === 'tilt_plus_accel' ? 'tilt + acceleration' : 'tilt only'}</li>
+                  </ul>
+                  <p className="hint">beta(前後): {rawOrientation.x.toFixed(2)} / gamma(左右): {rawOrientation.y.toFixed(2)}</p>
+                  <p className="hint">
+                    acc x/y/z: {rawAcceleration.x?.toFixed(3) ?? 'null'} / {rawAcceleration.y?.toFixed(3) ?? 'null'} / {rawAcceleration.z?.toFixed(3) ?? 'null'}
+                  </p>
+                  <p className="hint">
+                    filtered acc x/y: {filteredAcceleration.x.toFixed(3)} / {filteredAcceleration.y.toFixed(3)}
+                  </p>
+                  <div className="sensorPreviewWrap">
+                    <div className="sensorPreview" aria-label="sensor cursor preview">
+                      <div className="sensorPreviewCircle" />
+                      <div
+                        className="dot"
+                        style={{
+                          left: '50%',
+                          top: '50%',
+                          transform: `translate(-50%, -50%) translate(${(position.x * 50).toFixed(2)}px, ${(position.y * 50).toFixed(2)}px)`,
+                        }}
+                      />
+                    </div>
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        sensorCheckCalibrationRef.current = { ...rawOrientation };
+                        filteredPointRef.current = { x: 0, y: 0 };
+                        filteredAccRef.current = { x: 0, y: 0 };
+                        setPosition({ x: 0, y: 0 });
+                      }}
+                    >
+                      センサ確認のゼロ再設定
+                    </button>
+                  </div>
+                  <div className="row">
+                    <button className="primary" onClick={goToPrepare}>
+                      トレーニングへ
+                    </button>
+                    <button className="secondary" onClick={goHome}>
+                      戻る
+                    </button>
+                  </div>
+                  {SENSOR_DEBUG && (
+                    <p className="hint">
+                      Params: gammaMax={CURSOR_PARAMS.gammaMax}, betaMax={CURSOR_PARAMS.betaMax}, rho={CURSOR_PARAMS.accFilterRho}, accDead={CURSOR_PARAMS.accDead}, aRef={CURSOR_PARAMS.aRef}, tiltW={CURSOR_PARAMS.tiltWeight}, accelW={CURSOR_PARAMS.accelWeight}, lambda={CURSOR_PARAMS.cursorLambda}
+                    </p>
+                  )}
+                  {SENSOR_DEBUG && (
+                    <p className="hint">
+                      Acc usable rule: latest {ACC_VALID_WINDOW} samples のうち {ACC_VALID_MIN_COUNT} 以上で x/y が non-null。
+                    </p>
+                  )}
                 </>
               )}
 

@@ -4,6 +4,7 @@ export type DurationOption = 20 | 30 | 60;
 
 export type Screen =
   | 'start'
+  | 'sensor_check'
   | 'prepare'
   | 'direction_calibration'
   | 'countdown'
@@ -25,6 +26,12 @@ export type Settings = {
 export type SensorPoint = {
   x: number;
   y: number;
+};
+
+export type AccelerationSample = {
+  x: number | null;
+  y: number | null;
+  z: number | null;
 };
 
 export type SessionLog = {
