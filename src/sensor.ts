@@ -36,8 +36,8 @@ export const AXIS_SIGNS = {
 
 export const ACCEL_BODY_MAPPING = {
   // bodyX: 左(-) / 右(+), bodyY: 前(-) / 後(+)
-  x: { sourceAxis: 'x', sign: 1 },
-  y: { sourceAxis: 'y', sign: 1 },
+  x: { sourceAxis: 'y', sign: 1 },
+  y: { sourceAxis: 'x', sign: -1 },
 } as const;
 
 export const MAX_RADIUS = 1;
