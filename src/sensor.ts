@@ -10,16 +10,10 @@ export const AXIS_STEP_LIMIT_Y_BACKWARD = 0.05;
 export const AXIS_DEADZONE_DEG_X = 1.2;
 export const AXIS_DEADZONE_DEG_Y = 2.2;
 export const CURSOR_PARAMS = {
-  gammaMax: EDGE_TILT_DEG,
-  betaMax: EDGE_TILT_DEG,
-  // acceleration の一次 IIR フィルタ係数（大きいほどなめらか）
-  accFilterRho: 0.8,
-  // m/s^2 の微小ノイズ抑制
-  accDead: 0.03,
-  // 正規化基準加速度
-  aRef: 0.45,
-  tiltWeight: 0.85,
-  accelWeight: 0.15,
+  heightRatio: 0.55,
+  velDecay: 0.9,
+  displayRadiusMeters: 0.05,
+  gravity: 9.81,
   // 最終表示の平滑化係数
   cursorLambda: 0.75,
 } as const;
@@ -47,16 +41,17 @@ export type CursorComputeInput = {
   calibration: SensorPoint;
   axisTransform: DisplayTransform;
   previousCursor: SensorPoint;
-  previousAccFiltered: SensorPoint;
+  previousVelocityLike: SensorPoint;
   accelBodyFrame: SensorPoint | null;
+  dtSec: number;
+  bodyHeightMeters: number;
 };
 
 export type CursorComputeOutput = {
   cursor: SensorPoint;
   rawComposite: SensorPoint;
   tiltOnly: SensorPoint;
-  accFiltered: SensorPoint;
-  accNormalized: SensorPoint;
+  velocityLike: SensorPoint;
   mode: 'tilt_only' | 'tilt_plus_accel';
 };
 
@@ -76,13 +71,7 @@ export function pointFromOrientation(
   event: DeviceOrientationEvent,
   calibration: SensorPoint,
 ): SensorPoint {
-  const mapped = mapOrientation(event);
-
-  const dxDeg = clamp(angularDelta(mapped.x, calibration.x), -INPUT_TILT_CLAMP_DEG, INPUT_TILT_CLAMP_DEG);
-  const dyDeg = clamp(angularDelta(mapped.y, calibration.y), -INPUT_TILT_CLAMP_DEG, INPUT_TILT_CLAMP_DEG);
-
-  const xDegSigned = applyDeadzone(dxDeg * AXIS_SIGNS.x, AXIS_DEADZONE_DEG_X);
-  const yDegSigned = applyDeadzone(dyDeg * AXIS_SIGNS.y, AXIS_DEADZONE_DEG_Y);
+  const { xDegSigned, yDegSigned } = getTiltDegrees(event, calibration);
 
   const normalized = {
     x: normalizeToDisplayRange(xDegSigned),
@@ -169,22 +158,41 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
 
 export function composeCursorPoint(input: CursorComputeInput): CursorComputeOutput {
   const tiltBodyFrame = pointFromOrientation(input.orientationEvent, input.calibration);
-  const tiltOnly = applyDisplayTransform(tiltBodyFrame, input.axisTransform);
-
-  const accFiltered = filterAcceleration(input.accelBodyFrame, input.previousAccFiltered, CURSOR_PARAMS.accFilterRho);
-  const hasAcceleration = input.accelBodyFrame !== null;
-
-  const accNormalized = {
-    x: normalizeAccelerationAxis(accFiltered.x),
-    y: normalizeAccelerationAxis(accFiltered.y),
+  const tiltOnlyNormalized = applyDisplayTransform(tiltBodyFrame, input.axisTransform);
+  const { xDegSigned, yDegSigned } = getTiltDegrees(input.orientationEvent, input.calibration);
+  const theta = {
+    x: (xDegSigned * Math.PI) / 180,
+    y: (yDegSigned * Math.PI) / 180,
   };
-  const accMapped = applyDisplayTransform(accNormalized, input.axisTransform);
+  const h = CURSOR_PARAMS.heightRatio * input.bodyHeightMeters;
+  const tiltBodyMeters = {
+    x: h * theta.x,
+    y: h * theta.y,
+  };
+  const tiltDisplayMeters = applyDisplayTransform(tiltBodyMeters, input.axisTransform);
+  const tiltOnly = limitToCircle(tiltOnlyNormalized, MAX_RADIUS);
+  const hasAcceleration = input.accelBodyFrame !== null;
+  const dt = clamp(input.dtSec, 1 / 120, 0.1);
+  const velDecay = clamp(CURSOR_PARAMS.velDecay, 0, 1);
+  const accelerationDisplay = input.accelBodyFrame
+    ? applyDisplayTransform(input.accelBodyFrame, input.axisTransform)
+    : { x: 0, y: 0 };
+  const velocityLike = hasAcceleration
+    ? {
+        x: velDecay * input.previousVelocityLike.x + accelerationDisplay.x * dt,
+        y: velDecay * input.previousVelocityLike.y + accelerationDisplay.y * dt,
+      }
+    : {
+        x: velDecay * input.previousVelocityLike.x,
+        y: velDecay * input.previousVelocityLike.y,
+      };
+  const omega0 = Math.sqrt(CURSOR_PARAMS.gravity / h);
 
   const rawComposite = limitToCircle(
     hasAcceleration
       ? {
-          x: CURSOR_PARAMS.tiltWeight * tiltOnly.x + CURSOR_PARAMS.accelWeight * accMapped.x,
-          y: CURSOR_PARAMS.tiltWeight * tiltOnly.y + CURSOR_PARAMS.accelWeight * accMapped.y,
+          x: clamp((tiltDisplayMeters.x + velocityLike.x / omega0) / CURSOR_PARAMS.displayRadiusMeters, -1, 1),
+          y: clamp((tiltDisplayMeters.y + velocityLike.y / omega0) / CURSOR_PARAMS.displayRadiusMeters, -1, 1),
         }
       : tiltOnly,
     MAX_RADIUS,
@@ -196,8 +204,7 @@ export function composeCursorPoint(input: CursorComputeInput): CursorComputeOutp
     cursor,
     rawComposite,
     tiltOnly,
-    accFiltered,
-    accNormalized,
+    velocityLike,
     mode: hasAcceleration ? 'tilt_plus_accel' : 'tilt_only',
   };
 }
@@ -223,28 +230,22 @@ function normalizeToDisplayRange(valueDeg: number): number {
   return clamp(valueDeg / EDGE_TILT_DEG, -1, 1);
 }
 
-function filterAcceleration(current: SensorPoint | null, prev: SensorPoint, rho: number): SensorPoint {
-  if (!current) {
-    return { ...prev };
-  }
-
-  const r = clamp(rho, 0, 1);
-  return {
-    x: r * prev.x + (1 - r) * current.x,
-    y: r * prev.y + (1 - r) * current.y,
-  };
-}
-
-function normalizeAccelerationAxis(value: number): number {
-  const withDeadzone = Math.abs(value) < CURSOR_PARAMS.accDead ? 0 : value;
-  return clamp(withDeadzone / CURSOR_PARAMS.aRef, -1, 1);
-}
-
 function applyDeadzone(valueDeg: number, deadzoneDeg: number): number {
   if (Math.abs(valueDeg) <= deadzoneDeg) {
     return 0;
   }
   return Math.sign(valueDeg) * (Math.abs(valueDeg) - deadzoneDeg);
+}
+
+function getTiltDegrees(event: DeviceOrientationEvent, calibration: SensorPoint) {
+  const mapped = mapOrientation(event);
+  const dxDeg = clamp(angularDelta(mapped.x, calibration.x), -INPUT_TILT_CLAMP_DEG, INPUT_TILT_CLAMP_DEG);
+  const dyDeg = clamp(angularDelta(mapped.y, calibration.y), -INPUT_TILT_CLAMP_DEG, INPUT_TILT_CLAMP_DEG);
+
+  return {
+    xDegSigned: applyDeadzone(dxDeg * AXIS_SIGNS.x, AXIS_DEADZONE_DEG_X),
+    yDegSigned: applyDeadzone(dyDeg * AXIS_SIGNS.y, AXIS_DEADZONE_DEG_Y),
+  };
 }
 
 function capDelta(delta: number, maxStep: number): number {

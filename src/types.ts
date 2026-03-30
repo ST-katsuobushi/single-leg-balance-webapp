@@ -21,6 +21,7 @@ export type Settings = {
   leg: Leg;
   durationSec: DurationOption;
   displayTransform: DisplayTransform;
+  heightMeters: number | null;
 };
 
 export type SensorPoint = {
