@@ -3,19 +3,13 @@ import type { AccelerationSample, DisplayTransform, SensorPoint } from './types'
 export const EDGE_TILT_DEG = 45;
 export const INPUT_TILT_CLAMP_DEG = 70;
 export const RAW_JUMP_REJECT_DEG = 28;
-export const AXIS_STEP_LIMIT_X = 0.2;
-export const AXIS_STEP_LIMIT_Y = 0.08;
-export const AXIS_STEP_LIMIT_Y_FORWARD = 0.06;
-export const AXIS_STEP_LIMIT_Y_BACKWARD = 0.05;
-export const AXIS_DEADZONE_DEG_X = 1.2;
-export const AXIS_DEADZONE_DEG_Y = 2.2;
+export const AXIS_STEP_LIMIT = 0.2;
+export const AXIS_DEADZONE_DEG = 1.2;
 export const CURSOR_PARAMS = {
   heightRatio: 0.55,
   velDecay: 0.9,
   displayRadiusMeters: 0.05,
   gravity: 9.81,
-  // 最終表示の平滑化係数
-  cursorLambda: 0.75,
 } as const;
 
 export const AXIS_MAPPING = {
@@ -141,10 +135,9 @@ export function smoothPoint(next: SensorPoint, prev: SensorPoint, alphaX: number
   const wx = clamp(alphaX, 0, 1);
   const wy = clamp(alphaY, 0, 1);
 
-  const stepLimitY = next.y < prev.y ? AXIS_STEP_LIMIT_Y_FORWARD : AXIS_STEP_LIMIT_Y_BACKWARD;
   const limitedNext = {
-    x: prev.x + capDelta(next.x - prev.x, AXIS_STEP_LIMIT_X),
-    y: prev.y + capDelta(next.y - prev.y, Math.min(AXIS_STEP_LIMIT_Y, stepLimitY)),
+    x: prev.x + capDelta(next.x - prev.x, AXIS_STEP_LIMIT),
+    y: prev.y + capDelta(next.y - prev.y, AXIS_STEP_LIMIT),
   };
 
   return limitToCircle(
@@ -198,7 +191,7 @@ export function composeCursorPoint(input: CursorComputeInput): CursorComputeOutp
     MAX_RADIUS,
   );
 
-  const cursor = smoothPoint(rawComposite, input.previousCursor, 1 - CURSOR_PARAMS.cursorLambda, 1 - CURSOR_PARAMS.cursorLambda);
+  const cursor = rawComposite;
 
   return {
     cursor,
@@ -243,8 +236,8 @@ function getTiltDegrees(event: DeviceOrientationEvent, calibration: SensorPoint)
   const dyDeg = clamp(angularDelta(mapped.y, calibration.y), -INPUT_TILT_CLAMP_DEG, INPUT_TILT_CLAMP_DEG);
 
   return {
-    xDegSigned: applyDeadzone(dxDeg * AXIS_SIGNS.x, AXIS_DEADZONE_DEG_X),
-    yDegSigned: applyDeadzone(dyDeg * AXIS_SIGNS.y, AXIS_DEADZONE_DEG_Y),
+    xDegSigned: applyDeadzone(dxDeg * AXIS_SIGNS.x, AXIS_DEADZONE_DEG),
+    yDegSigned: applyDeadzone(dyDeg * AXIS_SIGNS.y, AXIS_DEADZONE_DEG),
   };
 }
 
