@@ -25,6 +25,8 @@ const DIRECTION_CALIB_MIN_DELTA_DEG = 3;
 const ACC_VALID_WINDOW = 12;
 const ACC_VALID_MIN_COUNT = 8;
 const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
+const HEIGHT_MIN_CM = 120;
+const HEIGHT_MAX_CM = 220;
 
 type DeviceOrientationEventWithPermission = {
   requestPermission?: () => Promise<'granted' | 'denied'>;
@@ -32,7 +34,8 @@ type DeviceOrientationEventWithPermission = {
 
 function App() {
   const [screen, setScreen] = useState<Screen>('start');
-  const [settings, setSettings] = useState<Settings>(loadSettings());
+  const [settings, setSettings] = useState<Settings>(() => loadSettings());
+  const [heightCmInput, setHeightCmInput] = useState<string>('');
   const [countdown, setCountdown] = useState(3);
   const [remainingSec, setRemainingSec] = useState<number>(settings.durationSec);
   const [position, setPosition] = useState<SensorPoint>({ x: 0, y: 0 });
@@ -53,13 +56,19 @@ function App() {
   const totalCountRef = useRef(0);
   const previousRawRef = useRef<SensorPoint | null>(null);
   const filteredPointRef = useRef<SensorPoint>({ x: 0, y: 0 });
-  const filteredAccRef = useRef<SensorPoint>({ x: 0, y: 0 });
+  const velocityLikeRef = useRef<SensorPoint>({ x: 0, y: 0 });
+  const previousOrientationTsRef = useRef<number | null>(null);
+  const motionIntervalSecRef = useRef<number | null>(null);
   const [hasOrientationEvent, setHasOrientationEvent] = useState(false);
   const [accelerationSupported, setAccelerationSupported] = useState(false);
   const sensorCheckCalibrationRef = useRef<SensorPoint | null>(null);
   const accValidWindowRef = useRef<boolean[]>([]);
   const targetAreaRef = useRef<HTMLDivElement | null>(null);
   const [targetRadiusPx, setTargetRadiusPx] = useState(0);
+
+  useEffect(() => {
+    setHeightCmInput(settings.heightMeters === null ? '' : String(Math.round(settings.heightMeters * 100)));
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia('(orientation: portrait)');
@@ -86,7 +95,9 @@ function App() {
       setLeftTiltSample(null);
       previousRawRef.current = null;
       filteredPointRef.current = { x: 0, y: 0 };
-      filteredAccRef.current = { x: 0, y: 0 };
+      velocityLikeRef.current = { x: 0, y: 0 };
+      previousOrientationTsRef.current = null;
+      motionIntervalSecRef.current = null;
       setRawAcceleration({ x: null, y: null, z: null });
       setAccelerationSupported(false);
       sensorCheckCalibrationRef.current = null;
@@ -135,6 +146,10 @@ function App() {
       accValidWindowRef.current = windowBuffer;
       const validCount = windowBuffer.filter(Boolean).length;
       setAccelerationSupported(validCount >= ACC_VALID_MIN_COUNT);
+
+      if (typeof event.interval === 'number' && Number.isFinite(event.interval) && event.interval > 0) {
+        motionIntervalSecRef.current = event.interval / 1000;
+      }
     };
 
     window.addEventListener('devicemotion', handleMotion);
@@ -166,17 +181,29 @@ function App() {
       const accelBodyFrame = accelerationSupported
         ? mapAccelerationToBodyFrame(rawAcceleration)
         : null;
+      if (settings.heightMeters === null) {
+        return;
+      }
+      const currentTsMs = typeof event.timeStamp === 'number' ? event.timeStamp : performance.now();
+      const fallbackDtSec =
+        previousOrientationTsRef.current === null
+          ? 1 / 60
+          : (currentTsMs - previousOrientationTsRef.current) / 1000;
+      const dtSec = motionIntervalSecRef.current ?? fallbackDtSec;
+      previousOrientationTsRef.current = currentTsMs;
 
       const composed = composeCursorPoint({
         orientationEvent: event,
         calibration: activeCalibration,
         axisTransform: settings.displayTransform,
         previousCursor: filteredPointRef.current,
-        previousAccFiltered: filteredAccRef.current,
+        previousVelocityLike: velocityLikeRef.current,
         accelBodyFrame,
+        dtSec,
+        bodyHeightMeters: settings.heightMeters,
       });
       filteredPointRef.current = composed.cursor;
-      filteredAccRef.current = composed.accFiltered;
+      velocityLikeRef.current = composed.velocityLike;
       previousRawRef.current = latestRaw;
       setPosition(composed.cursor);
 
@@ -192,7 +219,7 @@ function App() {
 
     window.addEventListener('deviceorientation', handleOrientation);
     return () => window.removeEventListener('deviceorientation', handleOrientation);
-  }, [calibration, rawAcceleration.x, rawAcceleration.y, screen, settings.displayTransform]);
+  }, [calibration, rawAcceleration.x, rawAcceleration.y, screen, settings.displayTransform, settings.heightMeters]);
 
   useEffect(() => {
     if (screen !== 'countdown') return;
@@ -260,6 +287,20 @@ function App() {
     } as const;
   }, [accelerationSupported, hasOrientationEvent]);
 
+  const heightValidationMessage = useMemo(() => {
+    const trimmed = heightCmInput.trim();
+    if (trimmed.length === 0) return '身長を入力してください。';
+    if (!/^\d+(\.\d+)?$/.test(trimmed)) return '身長は数値で入力してください。';
+
+    const cm = Number(trimmed);
+    if (!Number.isFinite(cm)) return '身長の入力値が不正です。';
+    if (cm < HEIGHT_MIN_CM || cm > HEIGHT_MAX_CM) {
+      return `身長は${HEIGHT_MIN_CM}〜${HEIGHT_MAX_CM} cmの範囲で入力してください。`;
+    }
+    return '';
+  }, [heightCmInput]);
+  const isHeightValid = heightValidationMessage.length === 0 && settings.heightMeters !== null;
+
   async function requestMotionPermissionIfNeeded() {
     const anyOrientation = DeviceOrientationEvent as unknown as DeviceOrientationEventWithPermission;
     if (typeof anyOrientation.requestPermission === 'function') {
@@ -283,6 +324,10 @@ function App() {
       setPermissionError(PORTRAIT_LOCK_MESSAGE);
       return;
     }
+    if (!isHeightValid) {
+      setPermissionError(heightValidationMessage || '身長を設定してください。');
+      return;
+    }
 
     try {
       setPermissionError('');
@@ -294,7 +339,9 @@ function App() {
       setLeftTiltSample(null);
       previousRawRef.current = null;
       filteredPointRef.current = { x: 0, y: 0 };
-      filteredAccRef.current = { x: 0, y: 0 };
+      velocityLikeRef.current = { x: 0, y: 0 };
+      previousOrientationTsRef.current = null;
+      motionIntervalSecRef.current = null;
       setRawAcceleration({ x: null, y: null, z: null });
       setAccelerationSupported(false);
       sensorCheckCalibrationRef.current = null;
@@ -309,7 +356,9 @@ function App() {
     setCalibration({ ...rawOrientation });
     previousRawRef.current = rawOrientation;
     filteredPointRef.current = { x: 0, y: 0 };
-    filteredAccRef.current = { x: 0, y: 0 };
+    velocityLikeRef.current = { x: 0, y: 0 };
+    previousOrientationTsRef.current = null;
+    motionIntervalSecRef.current = null;
     setPosition({ x: 0, y: 0 });
     setDirectionCalibStep('left');
     setDirectionCalibError('');
@@ -363,7 +412,9 @@ function App() {
     setLeftTiltSample(null);
     previousRawRef.current = null;
     filteredPointRef.current = { x: 0, y: 0 };
-    filteredAccRef.current = { x: 0, y: 0 };
+    velocityLikeRef.current = { x: 0, y: 0 };
+    previousOrientationTsRef.current = null;
+    motionIntervalSecRef.current = null;
     sensorCheckCalibrationRef.current = null;
     accValidWindowRef.current = [];
     setAccelerationSupported(false);
@@ -452,9 +503,35 @@ function App() {
                     ))}
                   </div>
 
+                  <label className="label" htmlFor="height-cm-input">身長（cm）</label>
+                  <input
+                    id="height-cm-input"
+                    type="number"
+                    inputMode="decimal"
+                    min={HEIGHT_MIN_CM}
+                    max={HEIGHT_MAX_CM}
+                    step="0.1"
+                    value={heightCmInput}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setHeightCmInput(value);
+                      const parsedCm = Number(value);
+                      const trimmed = value.trim();
+                      setSettings((prev) => ({
+                        ...prev,
+                        heightMeters: trimmed.length > 0 && Number.isFinite(parsedCm) ? parsedCm / 100 : null,
+                      }));
+                    }}
+                  />
+                  {heightValidationMessage && <p className="error">{heightValidationMessage}</p>}
+
                   {permissionError && <p className="error">{permissionError}</p>}
                   <button
                     onClick={async () => {
+                      if (!isHeightValid) {
+                        setPermissionError(heightValidationMessage || '身長を設定してください。');
+                        return;
+                      }
                       try {
                         await requestMotionPermissionIfNeeded();
                         setPermissionError('');
@@ -494,7 +571,9 @@ function App() {
                         onClick={() => {
                           sensorCheckCalibrationRef.current = { ...rawOrientation };
                           filteredPointRef.current = { x: 0, y: 0 };
-                          filteredAccRef.current = { x: 0, y: 0 };
+                          velocityLikeRef.current = { x: 0, y: 0 };
+                          previousOrientationTsRef.current = null;
+                          motionIntervalSecRef.current = null;
                           setPosition({ x: 0, y: 0 });
                         }}
                       >
@@ -528,10 +607,11 @@ function App() {
                     <button className="secondary" onClick={goHome}>
                       戻る
                     </button>
-                    <button className="primary" onClick={goToPrepare} disabled={!hasOrientationEvent}>
+                    <button className="primary" onClick={goToPrepare} disabled={!hasOrientationEvent || !isHeightValid}>
                       トレーニングへ
                     </button>
                   </div>
+                  {!isHeightValid && <p className="error">身長を設定してください（{HEIGHT_MIN_CM}〜{HEIGHT_MAX_CM} cm）。</p>}
                 </>
               )}
 

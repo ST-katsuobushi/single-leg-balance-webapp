@@ -11,6 +11,7 @@ export const defaultSettings: Settings = {
     invertX: false,
     invertY: false,
   },
+  heightMeters: null,
 };
 
 export function loadSettings(): Settings {
@@ -27,12 +28,17 @@ export function loadSettings(): Settings {
       typeof parsedTransform.invertX === 'boolean' &&
       typeof parsedTransform.invertY === 'boolean';
 
+    const parsedHeightMeters = typeof parsed.heightMeters === 'number' && Number.isFinite(parsed.heightMeters)
+      ? parsed.heightMeters
+      : null;
+
     if ((parsed.leg === 'left' || parsed.leg === 'right') &&
       (parsed.durationSec === 20 || parsed.durationSec === 30 || parsed.durationSec === 60)) {
       return {
         leg: parsed.leg,
         durationSec: parsed.durationSec,
         displayTransform: hasValidTransform ? parsedTransform : defaultSettings.displayTransform,
+        heightMeters: parsedHeightMeters,
       };
     }
 
