@@ -26,6 +26,8 @@ const ACC_VALID_WINDOW = 12;
 const ACC_VALID_MIN_COUNT = 8;
 const INTERVAL_AVG_WINDOW = 8;
 const MIN_VALID_INTERVAL_MS = 1;
+const MAX_VALID_INTERVAL_MS = 250;
+const SENSOR_RATE_MEASURE_DURATION_MS = 10_000;
 const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
 const HEIGHT_MIN_CM = 120;
 const HEIGHT_MAX_CM = 220;
@@ -67,12 +69,17 @@ function App() {
   const previousMotionEventTsRef = useRef<number | null>(null);
   const [motionSamplingHz, setMotionSamplingHz] = useState<number | null>(null);
   const [orientationSamplingHz, setOrientationSamplingHz] = useState<number | null>(null);
+  const [samplingMeasureElapsedMs, setSamplingMeasureElapsedMs] = useState(0);
+  const [isSamplingMeasuring, setIsSamplingMeasuring] = useState(false);
   const [hasOrientationEvent, setHasOrientationEvent] = useState(false);
   const [accelerationSupported, setAccelerationSupported] = useState(false);
   const sensorCheckCalibrationRef = useRef<SensorPoint | null>(null);
   const accValidWindowRef = useRef<boolean[]>([]);
   const targetAreaRef = useRef<HTMLDivElement | null>(null);
   const [targetRadiusPx, setTargetRadiusPx] = useState(0);
+  const samplingMeasureStartMsRef = useRef<number | null>(null);
+  const motionMeasureIntervalsRef = useRef<number[]>([]);
+  const orientationMeasureIntervalsRef = useRef<number[]>([]);
 
   useEffect(() => {
     setHeightCmInput(settings.heightMeters === null ? '' : String(Math.round(settings.heightMeters * 100)));
@@ -117,8 +124,31 @@ function App() {
       sensorCheckCalibrationRef.current = null;
       accValidWindowRef.current = [];
       setPermissionError('');
+      resetSamplingMeasurement();
     }
   }, [isPortraitViewport, screen]);
+
+  useEffect(() => {
+    if (screen === 'sensor_check') {
+      startSamplingMeasurement();
+      return;
+    }
+    resetSamplingMeasurement();
+  }, [screen]);
+
+  useEffect(() => {
+    if (!isSamplingMeasuring || samplingMeasureStartMsRef.current === null) return;
+
+    const timer = window.setInterval(() => {
+      const elapsedMs = performance.now() - samplingMeasureStartMsRef.current!;
+      setSamplingMeasureElapsedMs(Math.min(SENSOR_RATE_MEASURE_DURATION_MS, elapsedMs));
+      if (elapsedMs >= SENSOR_RATE_MEASURE_DURATION_MS) {
+        finishSamplingMeasurement();
+      }
+    }, 100);
+
+    return () => window.clearInterval(timer);
+  }, [isSamplingMeasuring]);
 
   useEffect(() => {
     saveSettings(settings);
@@ -180,12 +210,20 @@ function App() {
         intervalMs = event.interval < 1 ? event.interval * 1000 : event.interval;
       }
 
-      if (intervalMs !== null && intervalMs >= MIN_VALID_INTERVAL_MS) {
+      if (
+        intervalMs !== null &&
+        intervalMs >= MIN_VALID_INTERVAL_MS &&
+        intervalMs <= MAX_VALID_INTERVAL_MS
+      ) {
         motionIntervalSecRef.current = intervalMs / 1000;
-        const intervalWindow = [...motionIntervalWindowRef.current, intervalMs].slice(-INTERVAL_AVG_WINDOW);
+        const intervalWindow = [...motionIntervalWindowRef.current, intervalMs].slice(
+          -INTERVAL_AVG_WINDOW,
+        );
         motionIntervalWindowRef.current = intervalWindow;
-        const avgIntervalMs = intervalWindow.reduce((sum, ms) => sum + ms, 0) / intervalWindow.length;
-        setMotionSamplingHz(1000 / avgIntervalMs);
+
+        if (isSamplingMeasuring) {
+          motionMeasureIntervalsRef.current.push(intervalMs);
+        }
       }
     };
 
@@ -202,11 +240,18 @@ function App() {
       const currentEventTs = typeof event.timeStamp === 'number' ? event.timeStamp : performance.now();
       if (previousOrientationEventTsRef.current !== null) {
         const intervalMs = currentEventTs - previousOrientationEventTsRef.current;
-        if (Number.isFinite(intervalMs) && intervalMs > 0) {
-          const intervalWindow = [...orientationIntervalWindowRef.current, intervalMs].slice(-INTERVAL_AVG_WINDOW);
+        if (
+          Number.isFinite(intervalMs) &&
+          intervalMs >= MIN_VALID_INTERVAL_MS &&
+          intervalMs <= MAX_VALID_INTERVAL_MS
+        ) {
+          const intervalWindow = [...orientationIntervalWindowRef.current, intervalMs].slice(
+            -INTERVAL_AVG_WINDOW,
+          );
           orientationIntervalWindowRef.current = intervalWindow;
-          const avgIntervalMs = intervalWindow.reduce((sum, ms) => sum + ms, 0) / intervalWindow.length;
-          setOrientationSamplingHz(1000 / avgIntervalMs);
+          if (isSamplingMeasuring) {
+            orientationMeasureIntervalsRef.current.push(intervalMs);
+          }
         }
       }
       previousOrientationEventTsRef.current = currentEventTs;
@@ -268,7 +313,15 @@ function App() {
 
     window.addEventListener('deviceorientation', handleOrientation);
     return () => window.removeEventListener('deviceorientation', handleOrientation);
-  }, [calibration, rawAcceleration.x, rawAcceleration.y, screen, settings.displayTransform, settings.heightMeters]);
+  }, [
+    calibration,
+    isSamplingMeasuring,
+    rawAcceleration.x,
+    rawAcceleration.y,
+    screen,
+    settings.displayTransform,
+    settings.heightMeters,
+  ]);
 
   useEffect(() => {
     if (screen !== 'countdown') return;
@@ -525,6 +578,41 @@ function App() {
     }
   }
 
+  function computeAverageHz(intervalsMs: number[]) {
+    if (intervalsMs.length === 0) return null;
+    const meanIntervalMs = intervalsMs.reduce((sum, value) => sum + value, 0) / intervalsMs.length;
+    if (!Number.isFinite(meanIntervalMs) || meanIntervalMs <= 0) return null;
+    return 1000 / meanIntervalMs;
+  }
+
+  function resetSamplingMeasurement() {
+    samplingMeasureStartMsRef.current = null;
+    motionMeasureIntervalsRef.current = [];
+    orientationMeasureIntervalsRef.current = [];
+    setSamplingMeasureElapsedMs(0);
+    setIsSamplingMeasuring(false);
+    setMotionSamplingHz(null);
+    setOrientationSamplingHz(null);
+  }
+
+  function finishSamplingMeasurement() {
+    if (!isSamplingMeasuring) return;
+    setIsSamplingMeasuring(false);
+    setSamplingMeasureElapsedMs(SENSOR_RATE_MEASURE_DURATION_MS);
+    setMotionSamplingHz(computeAverageHz(motionMeasureIntervalsRef.current));
+    setOrientationSamplingHz(computeAverageHz(orientationMeasureIntervalsRef.current));
+  }
+
+  function startSamplingMeasurement() {
+    samplingMeasureStartMsRef.current = performance.now();
+    motionMeasureIntervalsRef.current = [];
+    orientationMeasureIntervalsRef.current = [];
+    setSamplingMeasureElapsedMs(0);
+    setIsSamplingMeasuring(true);
+    setMotionSamplingHz(null);
+    setOrientationSamplingHz(null);
+  }
+
   return (
     <main className="viewportRoot">
       {!isPortraitViewport ? (
@@ -668,11 +756,20 @@ function App() {
                         <p>{accelerationSupported ? '使用可' : '不可'}</p>
                         <p>推奨モード</p>
                         <p>{sensorCheckSummary.mode}</p>
-                        <p>motion 更新頻度</p>
+                        <p>更新頻度測定</p>
+                        <p>
+                          {isSamplingMeasuring
+                            ? `測定中… ${(samplingMeasureElapsedMs / 1000).toFixed(1)} / ${(SENSOR_RATE_MEASURE_DURATION_MS / 1000).toFixed(1)} s`
+                            : '測定完了'}
+                        </p>
+                        <p>motion 平均Hz(10秒)</p>
                         <p>{motionSamplingHz === null ? '-' : `${motionSamplingHz.toFixed(2)} Hz`}</p>
-                        <p>orientation 更新頻度</p>
+                        <p>orientation 平均Hz(10秒)</p>
                         <p>{orientationSamplingHz === null ? '-' : `${orientationSamplingHz.toFixed(2)} Hz`}</p>
                       </div>
+                      <button className="secondary" onClick={startSamplingMeasurement} disabled={isSamplingMeasuring}>
+                        再測定
+                      </button>
 
                       <p className="hint sensorCompactLine">
                         beta / gamma: {rawOrientation.x.toFixed(1)} / {rawOrientation.y.toFixed(1)} ・ acc x / y:{' '}
