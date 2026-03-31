@@ -31,6 +31,9 @@ const SENSOR_RATE_MEASURE_DURATION_MS = 10_000;
 const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
 const HEIGHT_MIN_CM = 120;
 const HEIGHT_MAX_CM = 220;
+const START_OFFSET_WINDOW_MS = 200;
+const START_OFFSET_MAX_SAMPLES = 12;
+const START_OFFSET_MIN_SAMPLES = 3;
 
 type DeviceOrientationEventWithPermission = {
   requestPermission?: () => Promise<'granted' | 'denied'>;
@@ -81,6 +84,8 @@ function App() {
   const samplingMeasureStartMsRef = useRef<number | null>(null);
   const motionMeasureIntervalsRef = useRef<number[]>([]);
   const orientationMeasureIntervalsRef = useRef<number[]>([]);
+  const recentCursorSamplesRef = useRef<Array<{ point: SensorPoint; tsMs: number }>>([]);
+  const trialStartOffsetRef = useRef<SensorPoint>({ x: 0, y: 0 });
 
   useEffect(() => {
     setHeightCmInput(settings.heightMeters === null ? '' : String(Math.round(settings.heightMeters * 100)));
@@ -174,7 +179,7 @@ function App() {
       observer.disconnect();
       window.removeEventListener('resize', updateRadius);
     };
-  }, [screen]);
+  }, [screen, directionCalibStep]);
 
   useEffect(() => {
     const handleMotion = (event: DeviceMotionEvent) => {
@@ -300,10 +305,22 @@ function App() {
       filteredPointRef.current = composed.cursor;
       velocityLikeRef.current = composed.velocityLike;
       previousRawRef.current = latestRaw;
-      setPosition(composed.cursor);
+      const nowMs = performance.now();
+      recentCursorSamplesRef.current = [...recentCursorSamplesRef.current, { point: composed.cursor, tsMs: nowMs }].slice(
+        -START_OFFSET_MAX_SAMPLES,
+      );
+
+      const displayPoint =
+        screen === 'training' || screen === 'countdown'
+          ? normalizeRelativePoint({
+              x: composed.cursor.x - trialStartOffsetRef.current.x,
+              y: composed.cursor.y - trialStartOffsetRef.current.y,
+            })
+          : composed.cursor;
+      setPosition(displayPoint);
 
       if (screen === 'training') {
-        const d = distanceFromCenter(composed.cursor);
+        const d = distanceFromCenter(displayPoint);
         swayValuesRef.current.push(d);
         totalCountRef.current += 1;
         if (d <= TARGET_RADIUS) {
@@ -391,7 +408,7 @@ function App() {
 
   const heightValidationMessage = useMemo(() => {
     const trimmed = heightCmInput.trim();
-    if (trimmed.length === 0) return '身長を入力してください。';
+    if (trimmed.length === 0) return '身長を入力してください';
     if (!/^\d+(\.\d+)?$/.test(trimmed)) return '身長は数値で入力してください。';
 
     const cm = Number(trimmed);
@@ -439,6 +456,8 @@ function App() {
       setDirectionCalibStep('left');
       setDirectionCalibError('');
       setLeftTiltSample(null);
+      trialStartOffsetRef.current = { x: 0, y: 0 };
+      recentCursorSamplesRef.current = [];
       previousRawRef.current = null;
       filteredPointRef.current = { x: 0, y: 0 };
       velocityLikeRef.current = { x: 0, y: 0 };
@@ -471,6 +490,8 @@ function App() {
     orientationIntervalWindowRef.current = [];
     previousOrientationEventTsRef.current = null;
     previousMotionEventTsRef.current = null;
+    trialStartOffsetRef.current = { x: 0, y: 0 };
+    recentCursorSamplesRef.current = [];
     setMotionSamplingHz(null);
     setOrientationSamplingHz(null);
     setPosition({ x: 0, y: 0 });
@@ -481,6 +502,28 @@ function App() {
   }
 
   function startCountdown() {
+    const nowMs = performance.now();
+    const recentForOffset = recentCursorSamplesRef.current.filter(
+      (sample) => nowMs - sample.tsMs <= START_OFFSET_WINDOW_MS,
+    );
+    if (recentForOffset.length >= START_OFFSET_MIN_SAMPLES) {
+      const sum = recentForOffset.reduce(
+        (acc, sample) => ({
+          x: acc.x + sample.point.x,
+          y: acc.y + sample.point.y,
+        }),
+        { x: 0, y: 0 },
+      );
+      trialStartOffsetRef.current = {
+        x: sum.x / recentForOffset.length,
+        y: sum.y / recentForOffset.length,
+      };
+    } else if (recentForOffset.length > 0) {
+      const latest = recentForOffset[recentForOffset.length - 1];
+      trialStartOffsetRef.current = { ...latest.point };
+    } else {
+      trialStartOffsetRef.current = { x: 0, y: 0 };
+    }
     setCountdown(3);
     setScreen('countdown');
   }
@@ -524,6 +567,8 @@ function App() {
     setDirectionCalibStep('left');
     setDirectionCalibError('');
     setLeftTiltSample(null);
+    trialStartOffsetRef.current = { x: 0, y: 0 };
+    recentCursorSamplesRef.current = [];
     previousRawRef.current = null;
     filteredPointRef.current = { x: 0, y: 0 };
     velocityLikeRef.current = { x: 0, y: 0 };
@@ -616,6 +661,17 @@ function App() {
     setOrientationSamplingHz(null);
   }
 
+  function normalizeRelativePoint(point: SensorPoint): SensorPoint {
+    const distance = Math.hypot(point.x, point.y);
+    if (!Number.isFinite(distance) || distance <= 1) {
+      return point;
+    }
+    return {
+      x: point.x / distance,
+      y: point.y / distance,
+    };
+  }
+
   return (
     <main className="viewportRoot">
       {!isPortraitViewport ? (
@@ -681,7 +737,9 @@ function App() {
                       }));
                     }}
                   />
-                  {heightValidationMessage && <p className="error">{heightValidationMessage}</p>}
+                  <div className="startErrorSlot" aria-live="polite">
+                    {heightValidationMessage && <p className="error compactError">{heightValidationMessage}</p>}
+                  </div>
 
                   {permissionError && <p className="error">{permissionError}</p>}
                   <button

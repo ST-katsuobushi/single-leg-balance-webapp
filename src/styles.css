@@ -148,6 +148,17 @@ button:disabled {
   color: #c53030;
 }
 
+.compactError {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.startErrorSlot {
+  min-height: calc(var(--screen-short) * 0.045);
+  display: flex;
+  align-items: center;
+}
+
 .big {
   font-size: calc(var(--screen-short) * 0.18);
   text-align: center;
