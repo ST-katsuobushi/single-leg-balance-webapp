@@ -24,6 +24,7 @@ const TARGET_RADIUS = 0.4;
 const DIRECTION_CALIB_MIN_DELTA_DEG = 3;
 const ACC_VALID_WINDOW = 12;
 const ACC_VALID_MIN_COUNT = 8;
+const INTERVAL_AVG_WINDOW = 8;
 const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
 const HEIGHT_MIN_CM = 120;
 const HEIGHT_MAX_CM = 220;
@@ -59,6 +60,11 @@ function App() {
   const velocityLikeRef = useRef<SensorPoint>({ x: 0, y: 0 });
   const previousOrientationTsRef = useRef<number | null>(null);
   const motionIntervalSecRef = useRef<number | null>(null);
+  const motionIntervalWindowRef = useRef<number[]>([]);
+  const orientationIntervalWindowRef = useRef<number[]>([]);
+  const previousOrientationEventTsRef = useRef<number | null>(null);
+  const [motionSamplingHz, setMotionSamplingHz] = useState<number | null>(null);
+  const [orientationSamplingHz, setOrientationSamplingHz] = useState<number | null>(null);
   const [hasOrientationEvent, setHasOrientationEvent] = useState(false);
   const [accelerationSupported, setAccelerationSupported] = useState(false);
   const sensorCheckCalibrationRef = useRef<SensorPoint | null>(null);
@@ -98,6 +104,11 @@ function App() {
       velocityLikeRef.current = { x: 0, y: 0 };
       previousOrientationTsRef.current = null;
       motionIntervalSecRef.current = null;
+      motionIntervalWindowRef.current = [];
+      orientationIntervalWindowRef.current = [];
+      previousOrientationEventTsRef.current = null;
+      setMotionSamplingHz(null);
+      setOrientationSamplingHz(null);
       setRawAcceleration({ x: null, y: null, z: null });
       setAccelerationSupported(false);
       sensorCheckCalibrationRef.current = null;
@@ -149,6 +160,10 @@ function App() {
 
       if (typeof event.interval === 'number' && Number.isFinite(event.interval) && event.interval > 0) {
         motionIntervalSecRef.current = event.interval / 1000;
+        const intervalWindow = [...motionIntervalWindowRef.current, event.interval].slice(-INTERVAL_AVG_WINDOW);
+        motionIntervalWindowRef.current = intervalWindow;
+        const avgIntervalMs = intervalWindow.reduce((sum, ms) => sum + ms, 0) / intervalWindow.length;
+        setMotionSamplingHz(1000 / avgIntervalMs);
       }
     };
 
@@ -161,6 +176,18 @@ function App() {
       setHasOrientationEvent(true);
       const latestRaw = mapOrientation(event);
       setRawOrientation(latestRaw);
+
+      const currentEventTs = typeof event.timeStamp === 'number' ? event.timeStamp : performance.now();
+      if (previousOrientationEventTsRef.current !== null) {
+        const intervalMs = currentEventTs - previousOrientationEventTsRef.current;
+        if (Number.isFinite(intervalMs) && intervalMs > 0) {
+          const intervalWindow = [...orientationIntervalWindowRef.current, intervalMs].slice(-INTERVAL_AVG_WINDOW);
+          orientationIntervalWindowRef.current = intervalWindow;
+          const avgIntervalMs = intervalWindow.reduce((sum, ms) => sum + ms, 0) / intervalWindow.length;
+          setOrientationSamplingHz(1000 / avgIntervalMs);
+        }
+      }
+      previousOrientationEventTsRef.current = currentEventTs;
 
       const activeCalibration = calibration ?? (screen === 'sensor_check' ? sensorCheckCalibrationRef.current : null);
       if (!activeCalibration) {
@@ -342,6 +369,11 @@ function App() {
       velocityLikeRef.current = { x: 0, y: 0 };
       previousOrientationTsRef.current = null;
       motionIntervalSecRef.current = null;
+      motionIntervalWindowRef.current = [];
+      orientationIntervalWindowRef.current = [];
+      previousOrientationEventTsRef.current = null;
+      setMotionSamplingHz(null);
+      setOrientationSamplingHz(null);
       setRawAcceleration({ x: null, y: null, z: null });
       setAccelerationSupported(false);
       sensorCheckCalibrationRef.current = null;
@@ -359,6 +391,11 @@ function App() {
     velocityLikeRef.current = { x: 0, y: 0 };
     previousOrientationTsRef.current = null;
     motionIntervalSecRef.current = null;
+    motionIntervalWindowRef.current = [];
+    orientationIntervalWindowRef.current = [];
+    previousOrientationEventTsRef.current = null;
+    setMotionSamplingHz(null);
+    setOrientationSamplingHz(null);
     setPosition({ x: 0, y: 0 });
     setDirectionCalibStep('left');
     setDirectionCalibError('');
@@ -415,6 +452,11 @@ function App() {
     velocityLikeRef.current = { x: 0, y: 0 };
     previousOrientationTsRef.current = null;
     motionIntervalSecRef.current = null;
+    motionIntervalWindowRef.current = [];
+    orientationIntervalWindowRef.current = [];
+    previousOrientationEventTsRef.current = null;
+    setMotionSamplingHz(null);
+    setOrientationSamplingHz(null);
     sensorCheckCalibrationRef.current = null;
     accValidWindowRef.current = [];
     setAccelerationSupported(false);
@@ -574,6 +616,11 @@ function App() {
                           velocityLikeRef.current = { x: 0, y: 0 };
                           previousOrientationTsRef.current = null;
                           motionIntervalSecRef.current = null;
+                          motionIntervalWindowRef.current = [];
+                          orientationIntervalWindowRef.current = [];
+                          previousOrientationEventTsRef.current = null;
+                          setMotionSamplingHz(null);
+                          setOrientationSamplingHz(null);
                           setPosition({ x: 0, y: 0 });
                         }}
                       >
@@ -595,6 +642,10 @@ function App() {
                         <p>{accelerationSupported ? '使用可' : '不可'}</p>
                         <p>推奨モード</p>
                         <p>{sensorCheckSummary.mode}</p>
+                        <p>motion 更新頻度</p>
+                        <p>{motionSamplingHz === null ? '-' : `${motionSamplingHz.toFixed(2)} Hz`}</p>
+                        <p>orientation 更新頻度</p>
+                        <p>{orientationSamplingHz === null ? '-' : `${orientationSamplingHz.toFixed(2)} Hz`}</p>
                       </div>
 
                       <p className="hint sensorCompactLine">
