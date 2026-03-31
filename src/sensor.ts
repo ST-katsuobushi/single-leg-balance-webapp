@@ -4,7 +4,7 @@ export const EDGE_TILT_DEG = 45;
 export const INPUT_TILT_CLAMP_DEG = 70;
 export const RAW_JUMP_REJECT_DEG = 28;
 export const AXIS_STEP_LIMIT = 0.2;
-export const AXIS_DEADZONE_DEG = 1.2;
+export const AXIS_DEADZONE_DEG = 0;
 export const CURSOR_PARAMS = {
   heightRatio: 0.55,
   velDecay: 0.9,
