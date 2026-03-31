@@ -71,6 +71,7 @@ function App() {
   const [orientationSamplingHz, setOrientationSamplingHz] = useState<number | null>(null);
   const [samplingMeasureElapsedMs, setSamplingMeasureElapsedMs] = useState(0);
   const [isSamplingMeasuring, setIsSamplingMeasuring] = useState(false);
+  const isSamplingMeasuringRef = useRef(false);
   const [hasOrientationEvent, setHasOrientationEvent] = useState(false);
   const [accelerationSupported, setAccelerationSupported] = useState(false);
   const sensorCheckCalibrationRef = useRef<SensorPoint | null>(null);
@@ -221,7 +222,7 @@ function App() {
         );
         motionIntervalWindowRef.current = intervalWindow;
 
-        if (isSamplingMeasuring) {
+        if (isSamplingMeasuringRef.current) {
           motionMeasureIntervalsRef.current.push(intervalMs);
         }
       }
@@ -249,7 +250,7 @@ function App() {
             -INTERVAL_AVG_WINDOW,
           );
           orientationIntervalWindowRef.current = intervalWindow;
-          if (isSamplingMeasuring) {
+          if (isSamplingMeasuringRef.current) {
             orientationMeasureIntervalsRef.current.push(intervalMs);
           }
         }
@@ -315,7 +316,6 @@ function App() {
     return () => window.removeEventListener('deviceorientation', handleOrientation);
   }, [
     calibration,
-    isSamplingMeasuring,
     rawAcceleration.x,
     rawAcceleration.y,
     screen,
@@ -589,6 +589,7 @@ function App() {
     samplingMeasureStartMsRef.current = null;
     motionMeasureIntervalsRef.current = [];
     orientationMeasureIntervalsRef.current = [];
+    isSamplingMeasuringRef.current = false;
     setSamplingMeasureElapsedMs(0);
     setIsSamplingMeasuring(false);
     setMotionSamplingHz(null);
@@ -596,7 +597,8 @@ function App() {
   }
 
   function finishSamplingMeasurement() {
-    if (!isSamplingMeasuring) return;
+    if (!isSamplingMeasuringRef.current) return;
+    isSamplingMeasuringRef.current = false;
     setIsSamplingMeasuring(false);
     setSamplingMeasureElapsedMs(SENSOR_RATE_MEASURE_DURATION_MS);
     setMotionSamplingHz(computeAverageHz(motionMeasureIntervalsRef.current));
@@ -607,6 +609,7 @@ function App() {
     samplingMeasureStartMsRef.current = performance.now();
     motionMeasureIntervalsRef.current = [];
     orientationMeasureIntervalsRef.current = [];
+    isSamplingMeasuringRef.current = true;
     setSamplingMeasureElapsedMs(0);
     setIsSamplingMeasuring(true);
     setMotionSamplingHz(null);
