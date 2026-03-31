@@ -31,9 +31,6 @@ const SENSOR_RATE_MEASURE_DURATION_MS = 10_000;
 const PORTRAIT_LOCK_MESSAGE = '画面回転ロックをONにしてください';
 const HEIGHT_MIN_CM = 120;
 const HEIGHT_MAX_CM = 220;
-const START_OFFSET_WINDOW_MS = 200;
-const START_OFFSET_MAX_SAMPLES = 12;
-const START_OFFSET_MIN_SAMPLES = 3;
 
 type DeviceOrientationEventWithPermission = {
   requestPermission?: () => Promise<'granted' | 'denied'>;
@@ -84,8 +81,6 @@ function App() {
   const samplingMeasureStartMsRef = useRef<number | null>(null);
   const motionMeasureIntervalsRef = useRef<number[]>([]);
   const orientationMeasureIntervalsRef = useRef<number[]>([]);
-  const recentCursorSamplesRef = useRef<Array<{ point: SensorPoint; tsMs: number }>>([]);
-  const trialStartOffsetRef = useRef<SensorPoint>({ x: 0, y: 0 });
 
   useEffect(() => {
     setHeightCmInput(settings.heightMeters === null ? '' : String(Math.round(settings.heightMeters * 100)));
@@ -305,18 +300,7 @@ function App() {
       filteredPointRef.current = composed.cursor;
       velocityLikeRef.current = composed.velocityLike;
       previousRawRef.current = latestRaw;
-      const nowMs = performance.now();
-      recentCursorSamplesRef.current = [...recentCursorSamplesRef.current, { point: composed.cursor, tsMs: nowMs }].slice(
-        -START_OFFSET_MAX_SAMPLES,
-      );
-
-      const displayPoint =
-        screen === 'training' || screen === 'countdown'
-          ? normalizeRelativePoint({
-              x: composed.cursor.x - trialStartOffsetRef.current.x,
-              y: composed.cursor.y - trialStartOffsetRef.current.y,
-            })
-          : composed.cursor;
+      const displayPoint = normalizeRelativePoint(composed.cursor);
       setPosition(displayPoint);
 
       if (screen === 'training') {
@@ -456,8 +440,6 @@ function App() {
       setDirectionCalibStep('left');
       setDirectionCalibError('');
       setLeftTiltSample(null);
-      trialStartOffsetRef.current = { x: 0, y: 0 };
-      recentCursorSamplesRef.current = [];
       previousRawRef.current = null;
       filteredPointRef.current = { x: 0, y: 0 };
       velocityLikeRef.current = { x: 0, y: 0 };
@@ -490,8 +472,6 @@ function App() {
     orientationIntervalWindowRef.current = [];
     previousOrientationEventTsRef.current = null;
     previousMotionEventTsRef.current = null;
-    trialStartOffsetRef.current = { x: 0, y: 0 };
-    recentCursorSamplesRef.current = [];
     setMotionSamplingHz(null);
     setOrientationSamplingHz(null);
     setPosition({ x: 0, y: 0 });
@@ -502,28 +482,6 @@ function App() {
   }
 
   function startCountdown() {
-    const nowMs = performance.now();
-    const recentForOffset = recentCursorSamplesRef.current.filter(
-      (sample) => nowMs - sample.tsMs <= START_OFFSET_WINDOW_MS,
-    );
-    if (recentForOffset.length >= START_OFFSET_MIN_SAMPLES) {
-      const sum = recentForOffset.reduce(
-        (acc, sample) => ({
-          x: acc.x + sample.point.x,
-          y: acc.y + sample.point.y,
-        }),
-        { x: 0, y: 0 },
-      );
-      trialStartOffsetRef.current = {
-        x: sum.x / recentForOffset.length,
-        y: sum.y / recentForOffset.length,
-      };
-    } else if (recentForOffset.length > 0) {
-      const latest = recentForOffset[recentForOffset.length - 1];
-      trialStartOffsetRef.current = { ...latest.point };
-    } else {
-      trialStartOffsetRef.current = { x: 0, y: 0 };
-    }
     setCountdown(3);
     setScreen('countdown');
   }
@@ -567,8 +525,6 @@ function App() {
     setDirectionCalibStep('left');
     setDirectionCalibError('');
     setLeftTiltSample(null);
-    trialStartOffsetRef.current = { x: 0, y: 0 };
-    recentCursorSamplesRef.current = [];
     previousRawRef.current = null;
     filteredPointRef.current = { x: 0, y: 0 };
     velocityLikeRef.current = { x: 0, y: 0 };
@@ -594,7 +550,7 @@ function App() {
 
   function captureDirectionSample() {
     if (!calibration) {
-      setDirectionCalibError('先にゼロ校正を行ってください。');
+      setDirectionCalibError('先に水平校正を行ってください。');
       return;
     }
 
@@ -686,7 +642,7 @@ function App() {
               {screen === 'start' && (
                 <>
                   <h1>片脚バランストレーニング</h1>
-                  <p className="hint">端末を横向きで両手保持し、画面を天井向きにして開始してください。</p>
+                  <p className="hint">端末を横向きにして、画面を上に向けた水平姿勢（テーブル上）で開始してください。</p>
 
                   <label className="label">脚の選択</label>
                   <div className="row">
@@ -854,9 +810,9 @@ function App() {
                 <>
                   <h2>準備確認</h2>
                   <ul>
-                    <li>スマホを横向きに両手で持ち、画面を天井向きにする</li>
-                    <li>肩関節90°屈曲（肩の高さ）で前に伸ばす</li>
-                    <li>肘を伸ばし、上肢はできるだけ動かさない</li>
+                    <li>端末をテーブル上に置き、画面を上に向けた水平姿勢にする</li>
+                    <li>端末には触れず、静止した状態で校正する</li>
+                    <li>この操作で水平基準を確定する</li>
                   </ul>
 
                   <button className="primary" onClick={calibrate}>
@@ -869,7 +825,7 @@ function App() {
                 <>
                   <h2>方向校正</h2>
                   <p className="hint">
-                    ゼロ校正後に、表示方向だけを端末ごとに合わせます（センサー処理の核は変更しません）。
+                    水平校正後に、左右・前後への傾き方向と表示方向の対応だけを合わせます。
                   </p>
                   {directionCalibStep === 'left' && (
                     <>
@@ -890,7 +846,7 @@ function App() {
                   {directionCalibStep === 'confirm' && (
                     <div className="circleScreenLayout">
                       <header className="circleTextBand circleTextBandTop">
-                        <p className="hint">左で左、前で上に動くか確認</p>
+                        <p className="hint">水平で中心、左で左、前で上に動くか確認</p>
                       </header>
 
                       <div className="circleCenterLayer">
