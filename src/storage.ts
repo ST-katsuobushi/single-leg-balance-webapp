@@ -6,6 +6,7 @@ const LOG_KEY = 'balance_app_logs_v1';
 export const defaultSettings: Settings = {
   leg: 'left',
   durationSec: 30,
+  feedbackDisplayRate: 100,
   displayTransform: {
     swapXY: false,
     invertX: false,
@@ -32,11 +33,17 @@ export function loadSettings(): Settings {
       ? parsed.heightMeters
       : null;
 
+    const parsedFeedbackDisplayRate =
+      parsed.feedbackDisplayRate === 100 || parsed.feedbackDisplayRate === 50 || parsed.feedbackDisplayRate === 0
+        ? parsed.feedbackDisplayRate
+        : defaultSettings.feedbackDisplayRate;
+
     if ((parsed.leg === 'left' || parsed.leg === 'right') &&
       (parsed.durationSec === 20 || parsed.durationSec === 30 || parsed.durationSec === 60)) {
       return {
         leg: parsed.leg,
         durationSec: parsed.durationSec,
+        feedbackDisplayRate: parsedFeedbackDisplayRate,
         displayTransform: hasValidTransform ? parsedTransform : defaultSettings.displayTransform,
         heightMeters: parsedHeightMeters,
       };
