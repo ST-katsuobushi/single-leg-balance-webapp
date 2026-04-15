@@ -250,6 +250,27 @@ button:disabled {
   border: 2px solid #22c55e;
 }
 
+.targetCross {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-color: rgba(15, 23, 42, 0.28);
+  border-style: dashed;
+  pointer-events: none;
+}
+
+.targetCrossHorizontal {
+  width: 33.33%;
+  border-top-width: 1px;
+  transform: translate(-50%, -50%);
+}
+
+.targetCrossVertical {
+  height: 33.33%;
+  border-left-width: 1px;
+  transform: translate(-50%, -50%);
+}
+
 .dot {
   width: var(--dot-size);
   height: var(--dot-size);
