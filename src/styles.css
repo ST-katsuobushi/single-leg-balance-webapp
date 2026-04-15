@@ -168,7 +168,18 @@ button:disabled {
 
 .countdownNumber {
   position: relative;
-  z-index: 3;
+  z-index: 1;
+  line-height: 1;
+  margin: 0;
+}
+
+.countdownOverlayLayer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 4;
+  pointer-events: none;
 }
 .timer {
   font-size: max(12px, calc(var(--screen-short) * 0.033));

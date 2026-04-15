@@ -897,8 +897,11 @@ function App() {
                 <div className="circleScreenLayout">
                   <header className="circleTextBand circleTextBandTop">
                     <h2 className="trainingTitle">開始まで</h2>
-                    <p className="big countdownNumber">{countdown}</p>
                   </header>
+
+                  <div className="countdownOverlayLayer" aria-hidden="true">
+                    <p className="big countdownNumber">{countdown}</p>
+                  </div>
 
                   <div className="circleCenterLayer">
                     <div ref={targetAreaRef} className="targetArea" aria-label="countdown target preview">
