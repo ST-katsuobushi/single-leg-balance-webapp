@@ -165,6 +165,11 @@ button:disabled {
   margin: 0;
 }
 
+
+.countdownNumber {
+  position: relative;
+  z-index: 3;
+}
 .timer {
   font-size: max(12px, calc(var(--screen-short) * 0.033));
   font-weight: 700;
@@ -184,10 +189,12 @@ button:disabled {
   inset: 0;
   display: grid;
   place-items: center;
+  z-index: 1;
 }
 
 .circleTextBand {
-  z-index: 1;
+  position: relative;
+  z-index: 2;
   min-height: 0;
   max-height: var(--text-band-max);
   display: flex;
