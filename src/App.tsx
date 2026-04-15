@@ -12,6 +12,7 @@ import {
 import type {
   AccelerationSample,
   DurationOption,
+  FeedbackDisplayRate,
   Leg,
   Screen,
   SensorPoint,
@@ -20,6 +21,7 @@ import type {
 } from './types';
 
 const DURATION_OPTIONS: DurationOption[] = [20, 30, 60];
+const FEEDBACK_DISPLAY_RATE_OPTIONS: FeedbackDisplayRate[] = [100, 50, 0];
 const TARGET_RADIUS = 0.4;
 const DIRECTION_CALIB_MIN_DELTA_DEG = 3;
 const ACC_VALID_WINDOW = 12;
@@ -614,6 +616,29 @@ function App() {
     setOrientationSamplingHz(null);
   }
 
+  function shouldShowMovingDot(currentScreen: Screen): boolean {
+    if (currentScreen === 'countdown') {
+      return true;
+    }
+
+    if (currentScreen !== 'training') {
+      return true;
+    }
+
+    const { feedbackDisplayRate } = settings;
+
+    if (feedbackDisplayRate === 100) {
+      return true;
+    }
+
+    if (feedbackDisplayRate === 0) {
+      return false;
+    }
+
+    const elapsedSec = settings.durationSec - remainingSec;
+    return elapsedSec < settings.durationSec / 2;
+  }
+
   function normalizeRelativePoint(point: SensorPoint): SensorPoint {
     const distance = Math.hypot(point.x, point.y);
     if (!Number.isFinite(distance) || distance <= 1) {
@@ -666,6 +691,19 @@ function App() {
                         onClick={() => setSettings((prev) => ({ ...prev, durationSec: duration }))}
                       >
                         {duration}秒
+                      </button>
+                    ))}
+                  </div>
+
+                  <label className="label">フィードバック表示率</label>
+                  <div className="row">
+                    {FEEDBACK_DISPLAY_RATE_OPTIONS.map((rate) => (
+                      <button
+                        key={rate}
+                        className={settings.feedbackDisplayRate === rate ? 'active' : ''}
+                        onClick={() => setSettings((prev) => ({ ...prev, feedbackDisplayRate: rate }))}
+                      >
+                        {rate}%
                       </button>
                     ))}
                   </div>
@@ -908,14 +946,16 @@ function App() {
                       <div className="targetCircle" />
                       <div className="targetCross targetCrossHorizontal" />
                       <div className="targetCross targetCrossVertical" />
-                      <div
-                        className="dot"
-                        style={{
-                          left: '50%',
-                          top: '50%',
-                          transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
-                        }}
-                      />
+                      {shouldShowMovingDot('countdown') && (
+                        <div
+                          className="dot"
+                          style={{
+                            left: '50%',
+                            top: '50%',
+                            transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -933,14 +973,16 @@ function App() {
                       <div className="targetCircle" />
                       <div className="targetCross targetCrossHorizontal" />
                       <div className="targetCross targetCrossVertical" />
-                      <div
-                        className="dot"
-                        style={{
-                          left: '50%',
-                          top: '50%',
-                          transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
-                        }}
-                      />
+                      {shouldShowMovingDot('training') && (
+                        <div
+                          className="dot"
+                          style={{
+                            left: '50%',
+                            top: '50%',
+                            transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
 

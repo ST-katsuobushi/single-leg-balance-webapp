@@ -17,9 +17,12 @@ export type DisplayTransform = {
   invertY: boolean;
 };
 
+export type FeedbackDisplayRate = 100 | 50 | 0;
+
 export type Settings = {
   leg: Leg;
   durationSec: DurationOption;
+  feedbackDisplayRate: FeedbackDisplayRate;
   displayTransform: DisplayTransform;
   heightMeters: number | null;
 };
