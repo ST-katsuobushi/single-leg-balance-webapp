@@ -660,7 +660,7 @@ function App() {
       ) : (
         <div className="rotatedShell">
           <div className="rotatedContent">
-            <section className="card">
+            <section className={`card ${screen === 'start' ? 'startCard' : ''}`}>
               {screen === 'start' && (
                 <>
                   <h1>片脚バランストレーニング</h1>
@@ -710,6 +710,7 @@ function App() {
 
                   <label className="label" htmlFor="height-cm-input">身長（cm）</label>
                   <input
+                    className="startInput"
                     id="height-cm-input"
                     type="number"
                     inputMode="decimal"
@@ -733,27 +734,29 @@ function App() {
                   </div>
 
                   {permissionError && <p className="error">{permissionError}</p>}
-                  <button
-                    onClick={async () => {
-                      if (!isHeightValid) {
-                        setPermissionError(heightValidationMessage || '身長を設定してください。');
-                        return;
-                      }
-                      try {
-                        await requestMotionPermissionIfNeeded();
-                        setPermissionError('');
-                        sensorCheckCalibrationRef.current = null;
-                        setScreen('sensor_check');
-                      } catch (error) {
-                        setPermissionError(error instanceof Error ? error.message : '不明なエラーが発生しました。');
-                      }
-                    }}
-                  >
-                    センサ確認モード
-                  </button>
-                  <button className="primary" onClick={() => goToPrepare()}>
-                    開始
-                  </button>
+                  <div className="column startPrimaryActions">
+                    <button
+                      onClick={async () => {
+                        if (!isHeightValid) {
+                          setPermissionError(heightValidationMessage || '身長を設定してください。');
+                          return;
+                        }
+                        try {
+                          await requestMotionPermissionIfNeeded();
+                          setPermissionError('');
+                          sensorCheckCalibrationRef.current = null;
+                          setScreen('sensor_check');
+                        } catch (error) {
+                          setPermissionError(error instanceof Error ? error.message : '不明なエラーが発生しました。');
+                        }
+                      }}
+                    >
+                      センサ確認モード
+                    </button>
+                    <button className="primary" onClick={() => goToPrepare()}>
+                      開始
+                    </button>
+                  </div>
                 </>
               )}
 
