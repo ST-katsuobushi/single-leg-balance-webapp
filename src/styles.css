@@ -123,6 +123,66 @@ button {
   min-height: calc(var(--screen-short) * 0.1);
 }
 
+input {
+  border: 1px solid #cbd5e1;
+  border-radius: calc(var(--screen-short) * 0.016);
+  padding: calc(var(--screen-short) * 0.01) calc(var(--screen-short) * 0.014);
+  font-size: var(--text-size);
+  line-height: 1.2;
+}
+
+.startCard {
+  --start-title-size: clamp(1.02rem, calc(var(--screen-short) * 0.040), 1.55rem);
+  --start-text-size: clamp(0.84rem, calc(var(--screen-short) * 0.028), 1.1rem);
+  --start-control-height: clamp(40px, calc(var(--screen-short) * 0.078), 58px);
+  --start-control-vpad: clamp(7px, calc(var(--screen-short) * 0.010), 12px);
+  --start-control-hpad: clamp(11px, calc(var(--screen-short) * 0.022), 20px);
+  --start-gap: clamp(6px, calc(var(--screen-short) * 0.009), 13px);
+  gap: var(--start-gap);
+}
+
+.startCard h1 {
+  font-size: var(--start-title-size);
+  line-height: 1.15;
+}
+
+.startCard p,
+.startCard label,
+.startCard button,
+.startCard input {
+  font-size: var(--start-text-size);
+  line-height: 1.22;
+}
+
+.startCard .hint {
+  line-height: 1.28;
+}
+
+.startCard .label {
+  margin-top: clamp(1px, calc(var(--screen-short) * 0.004), 7px);
+}
+
+.startCard .row {
+  gap: clamp(4px, calc(var(--screen-short) * 0.008), 10px);
+}
+
+.startCard button {
+  min-height: var(--start-control-height);
+  padding: var(--start-control-vpad) var(--start-control-hpad);
+}
+
+.startCard .startInput {
+  min-height: var(--start-control-height);
+}
+
+.startCard .startErrorSlot {
+  min-height: clamp(16px, calc(var(--screen-short) * 0.038), 24px);
+}
+
+.startPrimaryActions {
+  gap: clamp(6px, calc(var(--screen-short) * 0.01), 12px);
+}
+
 button.active,
 button.primary {
   background: #2563eb;
