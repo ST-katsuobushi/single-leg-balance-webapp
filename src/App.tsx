@@ -897,7 +897,7 @@ function App() {
                 <div className="circleScreenLayout">
                   <header className="circleTextBand circleTextBandTop">
                     <h2 className="trainingTitle">開始まで</h2>
-                    <p className="big">{countdown}</p>
+                    <p className="big countdownNumber">{countdown}</p>
                   </header>
 
                   <div className="circleCenterLayer">
