@@ -353,13 +353,6 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [screen, remainingSec]);
 
-  const meanSway = useMemo(() => {
-    const arr = swayValuesRef.current;
-    if (arr.length === 0) return 0;
-    const sum = arr.reduce((a, b) => a + b, 0);
-    return sum / arr.length;
-  }, [screen]);
-
   const sensorCheckSummary = useMemo(() => {
     const tiltAvailable = hasOrientationEvent;
     const accelAvailable = accelerationSupported;
@@ -422,7 +415,9 @@ function App() {
     }
   }
 
-  async function goToPrepare() {
+  async function goToPrepare(options?: { preserveCalibration?: boolean }) {
+    const preserveCalibration = options?.preserveCalibration ?? false;
+
     if (!isPortraitViewport) {
       setPermissionError(PORTRAIT_LOCK_MESSAGE);
       return;
@@ -435,11 +430,7 @@ function App() {
     try {
       setPermissionError('');
       await requestMotionPermissionIfNeeded();
-      setCalibration(null);
       setPosition({ x: 0, y: 0 });
-      setDirectionCalibStep('left');
-      setDirectionCalibError('');
-      setLeftTiltSample(null);
       previousRawRef.current = null;
       filteredPointRef.current = { x: 0, y: 0 };
       velocityLikeRef.current = { x: 0, y: 0 };
@@ -455,6 +446,12 @@ function App() {
       setAccelerationSupported(false);
       sensorCheckCalibrationRef.current = null;
       accValidWindowRef.current = [];
+      if (!preserveCalibration) {
+        setCalibration(null);
+        setDirectionCalibStep('left');
+        setDirectionCalibError('');
+        setLeftTiltSample(null);
+      }
       setScreen('prepare');
     } catch (error) {
       setPermissionError(error instanceof Error ? error.message : '不明なエラーが発生しました。');
@@ -716,7 +713,7 @@ function App() {
                   >
                     センサ確認モード
                   </button>
-                  <button className="primary" onClick={goToPrepare}>
+                  <button className="primary" onClick={() => goToPrepare()}>
                     開始
                   </button>
                 </>
@@ -798,7 +795,7 @@ function App() {
                     <button className="secondary" onClick={goHome}>
                       戻る
                     </button>
-                    <button className="primary" onClick={goToPrepare} disabled={!hasOrientationEvent || !isHeightValid}>
+                    <button className="primary" onClick={() => goToPrepare()} disabled={!hasOrientationEvent || !isHeightValid}>
                       トレーニングへ
                     </button>
                   </div>
@@ -811,13 +808,23 @@ function App() {
                   <h2>準備確認</h2>
                   <ul>
                     <li>端末をテーブル上に置き、画面を上に向けた水平姿勢にする</li>
-                    <li>端末には触れず、静止した状態で校正する</li>
-                    <li>この操作で水平基準を確定する</li>
+                    <li>同じ持ち方・姿勢で続ける場合は再校正不要です</li>
+                    <li>持ち直した場合や表示にずれを感じる場合は再校正してください</li>
                   </ul>
-
-                  <button className="primary" onClick={calibrate}>
-                    この姿勢で校正
-                  </button>
+                  {calibration ? (
+                    <div className="column">
+                      <button className="primary" onClick={startCountdown}>
+                        このまま開始
+                      </button>
+                      <button className="secondary" onClick={calibrate}>
+                        再校正する
+                      </button>
+                    </div>
+                  ) : (
+                    <button className="primary" onClick={calibrate}>
+                      この姿勢で校正
+                    </button>
+                  )}
                 </>
               )}
 
@@ -852,6 +859,8 @@ function App() {
                       <div className="circleCenterLayer">
                         <div ref={targetAreaRef} className="targetArea" aria-label="direction check preview">
                           <div className="targetCircle" />
+                          <div className="targetCross targetCrossHorizontal" />
+                          <div className="targetCross targetCrossVertical" />
                           <div
                             className="dot"
                             style={{
@@ -885,10 +894,28 @@ function App() {
               )}
 
               {screen === 'countdown' && (
-                <>
-                  <h2>開始まで</h2>
-                  <p className="big">{countdown}</p>
-                </>
+                <div className="circleScreenLayout">
+                  <header className="circleTextBand circleTextBandTop">
+                    <h2 className="trainingTitle">開始まで</h2>
+                    <p className="big">{countdown}</p>
+                  </header>
+
+                  <div className="circleCenterLayer">
+                    <div ref={targetAreaRef} className="targetArea" aria-label="countdown target preview">
+                      <div className="targetCircle" />
+                      <div className="targetCross targetCrossHorizontal" />
+                      <div className="targetCross targetCrossVertical" />
+                      <div
+                        className="dot"
+                        style={{
+                          left: '50%',
+                          top: '50%',
+                          transform: `translate(-50%, -50%) translate(${(position.x * targetRadiusPx).toFixed(2)}px, ${(position.y * targetRadiusPx).toFixed(2)}px)`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
               )}
 
               {screen === 'training' && (
@@ -901,6 +928,8 @@ function App() {
                   <div className="circleCenterLayer">
                     <div ref={targetAreaRef} className="targetArea" aria-label="balance target area">
                       <div className="targetCircle" />
+                      <div className="targetCross targetCrossHorizontal" />
+                      <div className="targetCross targetCrossVertical" />
                       <div
                         className="dot"
                         style={{
@@ -924,16 +953,15 @@ function App() {
                 <>
                   <h2>完了しました</h2>
                   <p className="hint">お疲れさまでした。</p>
-                  <p className="hint">平均揺れ指標: {meanSway.toFixed(3)}</p>
                   <div className="column">
-                    <button className="primary" onClick={goToPrepare}>
+                    <button className="primary" onClick={() => goToPrepare({ preserveCalibration: true })}>
                       同じ条件でもう一回
                     </button>
                     <button
                       className="secondary"
                       onClick={() => {
                         toggleLeg();
-                        goToPrepare();
+                        goToPrepare({ preserveCalibration: true });
                       }}
                     >
                       反対の脚で行う
