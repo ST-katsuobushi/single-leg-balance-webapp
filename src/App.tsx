@@ -1001,6 +1001,18 @@ function App() {
                 <>
                   <h2>完了しました</h2>
                   <p className="hint">お疲れさまでした。</p>
+                  <label className="label">次の試行のフィードバック表示率</label>
+                  <div className="row">
+                    {FEEDBACK_DISPLAY_RATE_OPTIONS.map((rate) => (
+                      <button
+                        key={rate}
+                        className={settings.feedbackDisplayRate === rate ? 'active' : ''}
+                        onClick={() => setSettings((prev) => ({ ...prev, feedbackDisplayRate: rate }))}
+                      >
+                        {rate}%
+                      </button>
+                    ))}
+                  </div>
                   <div className="column">
                     <button className="primary" onClick={() => goToPrepare({ preserveCalibration: true })}>
                       同じ条件でもう一回
