@@ -489,3 +489,8 @@ ul {
   margin: 0;
   padding-left: calc(var(--screen-short) * 0.04);
 }
+
+.finishedCard {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}

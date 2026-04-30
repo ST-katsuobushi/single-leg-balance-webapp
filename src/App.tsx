@@ -660,7 +660,9 @@ function App() {
       ) : (
         <div className="rotatedShell">
           <div className="rotatedContent">
-            <section className={`card ${screen === 'start' ? 'startCard' : ''}`}>
+            <section
+              className={`card ${screen === 'start' ? 'startCard' : ''} ${screen === 'finished' ? 'finishedCard' : ''}`}
+            >
               {screen === 'start' && (
                 <>
                   <h1>片脚バランストレーニング</h1>
