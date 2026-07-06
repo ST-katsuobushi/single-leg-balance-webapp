@@ -8,7 +8,7 @@ export const AXIS_DEADZONE_DEG = 0;
 export const CURSOR_PARAMS = {
   heightRatio: 0.55,
   velDecay: 0.9,
-  displayRadiusMeters: 0.05,
+  displayRadiusMeters: 0.03,
   gravity: 9.81,
 } as const;
 
