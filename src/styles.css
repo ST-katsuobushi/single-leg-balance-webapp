@@ -248,12 +248,6 @@ button:disabled {
   z-index: 4;
   pointer-events: none;
 }
-.timer {
-  font-size: max(12px, calc(var(--screen-short) * 0.033));
-  font-weight: 700;
-  margin: 0;
-}
-
 .circleScreenLayout {
   height: 100%;
   position: relative;
