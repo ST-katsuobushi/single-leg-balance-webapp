@@ -968,11 +968,6 @@ function App() {
 
               {screen === 'training' && (
                 <div className="circleScreenLayout">
-                  <header className="circleTextBand circleTextBandTop">
-                    <h2 className="trainingTitle">{settings.leg === 'left' ? '左脚' : '右脚'}</h2>
-                    <p className="timer">残り: {remainingSec} 秒</p>
-                  </header>
-
                   <div className="circleCenterLayer">
                     <div ref={targetAreaRef} className="targetArea" aria-label="balance target area">
                       <div className="targetCircle" />
